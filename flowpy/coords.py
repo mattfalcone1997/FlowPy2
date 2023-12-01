@@ -58,10 +58,15 @@ class CoordStruct(DataStruct):
             fig, ax = self._create_axis(fig_kw)
 
         coords = self.get(comp)
+
         if transform_xdata is not None:
             if not callable(transform_xdata):
                 raise TypeError("transform_xdata must be callable")
             coords = transform_xdata(coords)
+
+        if len(data) != len(coords):
+            raise ValueError("Coordinate and data have different "
+                             f"shapes ({len(data)}) vs ({len(coords)}).")
 
         ax.plot(coords, data, **kwargs)
 
@@ -190,3 +195,33 @@ class CoordStruct(DataStruct):
 
     def copy(self):
         return self.__class__(self._flow_type, self.to_dict(), copy=True)
+
+
+@CoordStruct.implements(np.allclose)
+def allclose(dstruct1: CoordStruct, dstruct2: CoordStruct, *args, **kwargs):
+    if dstruct1.index != dstruct2.index:
+        return False
+
+    if dstruct1.flow_type != dstruct2.flow_type:
+        return False
+
+    for d1, d2 in zip(dstruct1._data, dstruct2._data):
+        if not np.allclose(d1, d2, *args, **kwargs):
+            return False
+
+    return True
+
+
+@CoordStruct.implements(np.array_equal)
+def array_equal(dstruct1: CoordStruct, dstruct2: CoordStruct, *args, **kwargs):
+    if dstruct1.index != dstruct2.index:
+        return False
+
+    if dstruct1.flow_type != dstruct2.flow_type:
+        return False
+
+    for d1, d2 in zip(dstruct1._data, dstruct2._data):
+        if not np.array_equal(d1, d2, *args, **kwargs):
+            return False
+
+    return True

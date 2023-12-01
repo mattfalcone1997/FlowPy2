@@ -103,11 +103,13 @@ class FlowStructND(ArrayExtensionsBase):
     def reduce(self, operation: Callable, axis: str):
         coords = self.coords.copy()
         coords.remove(axis)
+        data_layout = list(self._data_layout)
+        data_layout.remove(axis)
 
         for a in axis:
-            axis_ind = self.comps.index(axis) + 2
+            axis_ind = list(self._data_layout).index(axis) + 2
             array = operation(self._array, axis=axis_ind)
-        return self._construct_fstruct(coords, array, self.times, self.comps, self._data_layout)
+        return self._construct_fstruct(coords, array, self.times, self.comps, data_layout)
 
     @property
     def flow_type(self) -> FlowType:
@@ -148,57 +150,57 @@ class FlowStructND(ArrayExtensionsBase):
     def get(self, *, time=None,
             comp=None,
             output_fs=True,
-            squeeze=False,
+            squeeze=True,
             drop_coords=True,
             **coords_kw) -> Union[ArrayLike, FlowStructND]:
+
         indexer = [slice(None)]*self._array.ndim
+        shape = [None]*self._array.ndim
 
-        drop_coords = []
-        if output_fs:
-            squeeze = False
+        indexer[0], shape[0], out_fst = self._process_time_index(time)
 
-        out_fs = False
+        indexer[1], shape[1], out_fsc = self._process_comp_index(comp)
 
-        if time is not None:
-            indexer[0], out_fs = self._process_time_index(time,
-                                                          squeeze,
-                                                          out_fs)
+        out_fs = out_fsc or out_fst
+
+        if coords_kw:
+            coord_dict = {}
+            data_layout = []
+            for i, d in enumerate(self._data_layout):
+                indexer[2+i], shape[2+i] = self._process_coord_index(d,
+                                                                     coords_kw)
+                if isinstance(indexer[2+i], (slice, list)) or not drop_coords:
+                    coord_dict[d] = self._coords[d][indexer[2+i]]
+                    data_layout.append(d)
+
+            if drop_coords:
+                drop_shapes = [2+i for i in range(len(indexer)-2)
+                               if isinstance(indexer[i+2], np.integer)]
+                for d in drop_shapes[::-1]:
+                    del shape[d]
         else:
-            indexer[0] = 0
+            coord_dict = self.coords.to_dict()
+            data_layout = self._data_layout
+            shape[2:] = self.shape
 
-        if comp is not None:
-            indexer[1], out_fs = self._process_comp_index(comp,
-                                                          squeeze,
-                                                          out_fs)
-        else:
-            indexer[1] = slice(None)
-
-        coord_dict = {}
-        data_layout = []
-        for i, d in enumerate(self._data_layout):
-            indexer[2+i] = self._process_coord_index(d,
-                                                     coords_kw[d],
-                                                     squeeze)
-
-            if isinstance(indexer[2+i], (slice, list)) or not drop_coords:
-                coord_dict[d] = self._coords[d][indexer[2+i]]
-                data_layout.append(d)
-
-        array = self._array[tuple(indexer)]
+        array = self._array[tuple(indexer)].reshape(shape)
 
         if out_fs and output_fs:
-            times = self._times[indexer[0]]
+            times = self.times[indexer[0]]
             comps = self._comps[indexer[1]]
-            return self._construct_fstruct(array, times, comps)
+            coords = self._coords.__class__(self.flow_type, coord_dict)
+
+            return self._construct_fstruct(coords, array, times, comps, data_layout)
 
         else:
-            return array
+            return array if not squeeze else np.squeeze(array)
 
     def _validate_inputs(self, inputs):
         super()._validate_inputs(inputs)
         for x in inputs:
             if isinstance(x, self.__class__):
-                self._check_fstruct_compat(x, True, True)
+                if isinstance(x, self.__class__):
+                    self._check_fstruct_compat(x, True, True)
 
     def __array_ufunc__(self,  ufunc, method, *inputs, **kwargs):
 
@@ -234,30 +236,46 @@ class FlowStructND(ArrayExtensionsBase):
     def _fstruct_promote(self, fstruct):
         return fstruct
 
-    def _process_time_index(self, time, squeeze, out_fs):
+    def _process_time_index(self, time):
+        if time is None:
+            return slice(None), len(self._times), len(self._times) > 1
+
         index = self._times.get(time)
         if isinstance(index, (slice, list)):
             out_fs = True
-        elif not squeeze:
+        else:
             index = [index]
+            out_fs = False
 
-        return index, out_fs
+        shape = self.times[index].size
+        return index, shape, out_fs
 
-    def _process_comp_index(self, comp, squeeze, out_fs):
+    def _process_comp_index(self, comp):
+        if comp is None:
+            return slice(None), len(self._comps), len(self.comps) > 1
+
         index = self._comps.get(comp)
+
         if isinstance(index, (slice, list)):
             out_fs = True
-        elif not squeeze:
+        else:
             index = [index]
+            out_fs = False
 
-        return index, out_fs
+        shape = len(self._comps[index])
+        return index, shape, out_fs
 
-    def _process_coord_index(self, key, coords, squeeze, out_fs):
-        index = self._coords.coord_index(key, coords)
-        if isinstance(index, int) and not squeeze:
-            index = [index]
+    def _process_coord_index(self, key, coords_kw):
+        if key not in coords_kw:
+            return slice(None), self._coords[key].size
 
-        return index
+        index = self._coords.coord_index(key, coords_kw[key])
+
+        if isinstance(index, int):
+            shape = 1
+        else:
+            shape = self._coords[key][index].size
+        return index, shape
 
     def _check_fstruct_compat(self, fstruct: FlowStructND,
                               check_times: bool = False,
@@ -270,7 +288,7 @@ class FlowStructND(ArrayExtensionsBase):
             raise ValueError("Data layout do not match")
 
         if check_times:
-            if self.times != fstruct.times:
+            if not np.array_equal(self.times, fstruct.times):
                 raise ValueError("Times do not match")
 
         if check_comps:
@@ -305,14 +323,16 @@ class FlowStructND(ArrayExtensionsBase):
         new_time_indexer = self._times.copy()
         time_indexers = [self._times]
         for fstruct in fstructs:
-            self._check_fstruct_compat(fstruct)
+            self._check_fstruct_compat(fstruct, check_comps=True)
+
             new_time_indexer.extend(fstruct._times)
             time_indexers.append(fstruct._times)
 
         shape = (len(new_time_indexer), len(self.comps), *self.shape)
         new_data = np.zeros(shape, dtype=self.dtype)
 
-        indexers = self._times.concat_indexers(time_indexers)
+        indexers = self._times.concat_indexers(*time_indexers)
+
         new_data[indexers[0]] = self._array
         for indexer, fstruct in zip(indexers[1:], fstructs):
             new_data[indexer] = fstruct._array
@@ -341,7 +361,7 @@ class FlowStructND(ArrayExtensionsBase):
         for k in kwargs:
             if k not in self._data_layout:
                 raise ValueError(f"{k} not in {self.__class__.__name__}")
-            if isinstance(kwargs[k], Number):
+            if not isinstance(kwargs[k], Number):
                 raise TypeError("Invalid type")
 
             self._coords[k] += kwargs[k]
@@ -363,7 +383,7 @@ class FlowStructND(ArrayExtensionsBase):
             coord = list(self._data_layout)
             for d in dir_plane:
                 coord.remove(d)
-            loc = {coord: loc}
+            loc = {coord[0]: loc}
 
         if isinstance(loc, Mapping):
             if not all(key in self._data_layout for key in loc):
@@ -403,15 +423,13 @@ class FlowStructND(ArrayExtensionsBase):
                         squeeze=True,
                         **coord_kw)
 
-        coords = self.coords.get(dir)
-
-        if data.shape != coords.shape:
-            raise RuntimeError("Invalid shape returned "
-                               "from plotting")
         if transform_ydata is not None:
             data = transform_ydata(data)
 
-        return self.coords.plot_line(comp, data,
+        if line_kw is None:
+            line_kw = {}
+
+        return self.coords.plot_line(line, data,
                                      transform_xdata=transform_xdata,
                                      ax=ax,
                                      fig_kw=fig_kw,
@@ -425,6 +443,7 @@ class FlowStructND(ArrayExtensionsBase):
                       transform_cdata: Callable = None) -> ArrayLike:
 
         coord_kw = self._get_plot_data(plane, loc, 2)
+
         data = self.get(time=time,
                         comp=comp,
                         output_fs=False,
@@ -462,6 +481,9 @@ class FlowStructND(ArrayExtensionsBase):
 
         data = self._base_contour(plane, loc, comp, time, transform_cdata)
 
+        if contour_kw is None:
+            contour_kw = {}
+
         return self.coords.pcolormesh(plane, data, ax=ax,
                                       transform_xdata=transform_xdata,
                                       transform_ydata=transform_ydata,
@@ -481,6 +503,9 @@ class FlowStructND(ArrayExtensionsBase):
                  fig_kw: Mapping = None) -> Axes:
 
         data = self._base_contour(plane, loc, comp, time, transform_cdata)
+
+        if contour_kw is None:
+            contour_kw = {}
 
         return self.coords.contourf(plane, data, ax=ax,
                                     transform_xdata=transform_xdata,
@@ -502,8 +527,31 @@ class FlowStructND(ArrayExtensionsBase):
 
         data = self._base_contour(plane, loc, comp, time, transform_cdata)
 
+        if contour_kw is None:
+            contour_kw = {}
+
         return self.coords.contour(plane, data, ax=ax,
                                    transform_xdata=transform_xdata,
                                    transform_ydata=transform_ydata,
                                    fig_kw=fig_kw,
                                    **contour_kw)
+
+
+@FlowStructND.implements(np.array_equal)
+def array_equal(fstruct1: FlowStructND, fstruct2: FlowStructND, *args, **kwargs):
+    try:
+        fstruct1._check_fstruct_compat(fstruct2, True, True)
+    except ValueError:
+        return False
+
+    return np.array_equal(fstruct1._array, fstruct2._array)
+
+
+@FlowStructND.implements(np.allclose)
+def allclose(fstruct1: FlowStructND, fstruct2: FlowStructND, *args, **kwargs):
+    try:
+        fstruct1._check_fstruct_compat(fstruct2, True, True)
+    except ValueError:
+        return False
+
+    return np.allclose(fstruct1._array, fstruct2._array)

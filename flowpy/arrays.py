@@ -89,9 +89,13 @@ class ArrayExtensionsBase(NDArrayOperatorsMixin, ABC):
     @classmethod
     def implements(cls, np_func):
         def decorator(func):
+            if cls.__name__ not in cls._NP_FUNCS:
+                cls._NP_FUNCS[cls.__name__] = {}
+                logger.debug(f"Creating dictionary for class {cls.__name__}")
+
             logger.debug(
                 f"Registering {np_func.__name__} with {func.__name__}")
-            cls._NP_FUNCS[np_func] = func
+            cls._NP_FUNCS[cls.__name__][np_func.__name__] = func
             return func
         return decorator
 
@@ -140,14 +144,20 @@ class ArrayExtensionsBase(NDArrayOperatorsMixin, ABC):
         return data
 
     def __array_function__(self, func, types, args, kwargs):
-        if func not in self._NP_FUNCS:
-            logger.debug(f"{func.__name__} not implemented. "
-                         f"Implemented funcs: {self._NP_FUNCS.keys()}")
+        cls_name = self.__class__.__name__
+        if cls_name not in self._NP_FUNCS:
+            logger.debug(f"{cls_name} is not present in _NP_FUNC dictionary "
+                         "not implement calls for this class")
+            return NotImplemented
+
+        if func.__name__ not in self._NP_FUNCS[self.__class__.__name__]:
+            logger.debug(f"{func.__name__} not implemented for {cls_name}. "
+                         f"Implemented funcs: {self._NP_FUNCS[cls_name].keys()}")
             return NotImplemented
         # Note: this allows subclasses that don't override
         # __array_function__ to handle MyArray objects
 
-        return self._NP_FUNCS[func](*args, **kwargs)
+        return self._NP_FUNCS[cls_name][func.__name__](*args, **kwargs)
 
 # class GroupArray(NDArrayOperatorsMixin):
 

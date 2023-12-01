@@ -101,17 +101,41 @@ class CompIndexer(IndexBase):
     def get(self, key) -> int:
         self.__update_accessor_dict()
         if isinstance(key, str):
-            return self.__accessor_dict[key]
+            try:
+                return self.__accessor_dict[key]
+            except KeyError as e:
+                raise KeyError(f"Component {key} not in indexer") from None
+
         elif isinstance(key, list):
-            return [self.__accessor_dict[k] for k in key]
+            try:
+                return [self.__accessor_dict[k] for k in key]
+            except KeyError:
+                raise KeyError("Some of the components in "
+                               f"{key} not present") from None
+
         elif isinstance(key, slice):
-            start = 0 if key.start is None else self.__accessor_dict[key.start]
-            stop = len(self._index) if key.stop is None\
-                else self.__accessor_dict[key.stop]+1
+            try:
+                start = 0 if key.start is None else self.__accessor_dict[key.start]
+            except KeyError:
+                raise KeyError("Start of component slice"
+                               f"{key.start} not present") from None
+
+            try:
+                stop = len(self._index) if key.stop is None\
+                    else self.__accessor_dict[key.stop]+1
+            except KeyError:
+                raise KeyError("End of component slice"
+                               f"{key.stop} not present") from None
+
             if key.step is not None:
                 raise ValueError("step not allowed for slice indexing")
 
+            if start >= stop:
+                raise ValueError("Slice start must be ordered "
+                                 "before slice stop")
+
             return slice(start, stop)
+
         else:
             raise KeyError("Invalid key: must be str, list or slice")
 
@@ -232,12 +256,17 @@ class TimeIndexer(IndexBase, NDArrayOperatorsMixin):
 
     def _verify_index(self, index: Iterable[str]) -> List[str]:
 
+        if isinstance(index, Number):
+            index = [index]
+
         for ind in index:
             if not isinstance(ind, Number):
                 raise IndexInitialisationError("Inputs must be numbers")
 
         if len(index) != len(set(index)):
             raise ValueError("Indices cannot be repeated")
+
+        index = np.array(index)
 
         diff = np.diff(index)
         if any(diff < 0):
@@ -280,24 +309,44 @@ class TimeIndexer(IndexBase, NDArrayOperatorsMixin):
 
         if isinstance(key, Number):
             key = self._check_key(key)
-            return self.__accessor_dict[key]
+            try:
+                return self.__accessor_dict[key]
+            except KeyError:
+                raise KeyError(f"Time {key} not present in "
+                               "indexer") from None
 
         elif isinstance(key, list):
-            return [self.__accessor_dict[self._check_key(k)] for k in key]
+            try:
+                return [self.__accessor_dict[self._check_key(k)] for k in key]
+            except KeyError:
+                raise KeyError("Some of the times in "
+                               f"{key} not present") from None
 
         elif isinstance(key, slice):
             if key.start is None:
                 start = 0
             else:
-                start = self.__accessor_dict[self._check_key(key.start)]
+                try:
+                    start = self.__accessor_dict[self._check_key(key.start)]
+                except KeyError:
+                    raise KeyError("Start of time slice"
+                                   f"{key.start} not present") from None
 
             if key.stop is None:
                 stop = len(self._index)
             else:
-                stop = self.__accessor_dict[self._check_key(key.stop)] + 1
+                try:
+                    stop = self.__accessor_dict[self._check_key(key.stop)] + 1
+                except KeyError:
+                    raise KeyError("End of time slice"
+                                   f"{key.stop} not present") from None
 
             if key.step is not None:
                 raise ValueError("step not allowed for slice indexing")
+
+            if start >= stop:
+                raise ValueError("Slice start must be ordered "
+                                 "before slice stop")
 
             return slice(start, stop)
         else:
@@ -340,6 +389,7 @@ class TimeIndexer(IndexBase, NDArrayOperatorsMixin):
         # check validity of indices
 
         indices_list = [np.array(index) for index in indices]
+
         for index in indices_list[1:]:
             if np.equal(index, indices_list[0]).any():
                 raise ValueError("Elements overlap")

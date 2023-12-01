@@ -21,7 +21,7 @@ def main():
     extras_require = {"dev": []}
     test_suite = 'nose.collector'
     tests_require = ['nose']
-    print(packages)
+
     setup(name=name,
           version=version,
           description=description,
