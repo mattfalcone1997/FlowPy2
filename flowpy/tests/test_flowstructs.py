@@ -7,6 +7,8 @@ import pytest
 from math import prod
 import numpy as np
 
+from test_hdf5 import test_filename
+
 
 @pytest.fixture
 def reference_fstruct():
@@ -367,6 +369,24 @@ def test_translate(reference_fstruct):
 
     assert all(f.coords['x'] < 50+0.5*np.diff(f.coords['x'])[0])
     assert all(f.coords['x'] > -50-0.5*np.diff(f.coords['x'])[0])
+
+
+def test_to_hdf(reference_fstruct, test_filename):
+
+    reference_fstruct.to_hdf(test_filename, 'w')
+
+    fstruct2 = reference_fstruct.__class__.from_hdf(test_filename)
+
+    assert reference_fstruct == fstruct2
+
+
+def test_to_netcdf(reference_fstruct, test_filename):
+
+    reference_fstruct.to_netcdf(test_filename, 'w')
+
+    fstruct2 = reference_fstruct.__class__.from_netcdf(test_filename)
+
+    assert reference_fstruct == fstruct2
 
 
 @check_figures_equal()

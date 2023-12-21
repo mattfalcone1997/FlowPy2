@@ -1,3 +1,4 @@
+from .io import hdf5, netcdf
 import numpy as np
 import matplotlib.pyplot as plt
 import logging
@@ -8,7 +9,7 @@ from .datastruct import DataStruct
 from .flow_type import FlowType
 from .gradient import (first_derivative,
                        second_derivative)
-
+from .indexers import CompIndexer
 logger = logging.getLogger(__name__)
 
 
@@ -28,6 +29,85 @@ class CoordStruct(DataStruct):
             diff = np.diff(d)
             if any(diff < 0):
                 raise ValueError("Coordinates must be in ascending order")
+
+    def to_hdf(self, fn_or_obj, mode: str = None, key=None):
+
+        g = hdf5.make_group(fn_or_obj, mode, key=key)
+
+        g = super().to_hdf(g)
+
+        self._flow_type.to_hdf(g, key='flow_type')
+
+        if isinstance(fn_or_obj, hdf5.H5_Group_File):
+            return g
+        else:
+            g.file.close()
+
+    @classmethod
+    def from_hdf(cls, fn_or_obj, key=None, tag_check=None):
+        g = hdf5.access_group(fn_or_obj, key)
+        if tag_check is None:
+            tag_check = 'strict'
+
+        hdf5.validate_tag(cls, g, tag_check)
+
+        index = CompIndexer.from_hdf(g, "index")
+        d = g['data']
+        data_array = d['data'][:]
+        shapes = d['shapes']
+        ndims = d['ndim'][:]
+
+        start = 0
+        stop = 0
+
+        arr_stop = 0
+        arr_start = 0
+
+        data = []
+
+        for ndim in ndims:
+            stop += ndim
+            shape = shapes[start:stop]
+            arr_stop += np.prod(shape)
+            item = data_array[arr_start:arr_stop].reshape(shape)
+            data.append(item)
+            start += ndim
+            arr_start += np.prod(shape)
+
+        array_backend = g.attrs['array_backend']
+
+        flow_type = FlowType.from_hdf(g, key='flow_type')
+        return CoordStruct(flow_type, data, index=index, array_backend=array_backend)
+
+    def to_netcdf(self, group):
+        if not netcdf.HAVE_NETCDF4:
+            raise ModuleNotFoundError("netCDF cannot be used")
+
+        netcdf.set_type_tag(type(self), group, "coords_tag")
+
+        self._flow_type.to_netcdf(group)
+        for key in self.index:
+            data = self.get(key)
+            group.createDimension(key, data.size)
+            dtype = data.dtype.kind + str(data.dtype.itemsize)
+            var = group.createVariable(key, dtype, (key,))
+            var[:] = data
+
+    @classmethod
+    def from_netcdf(cls, group, key=None, tag_check=None):
+        if not netcdf.HAVE_NETCDF4:
+            raise ModuleNotFoundError("netCDF cannot be used")
+
+        g = netcdf.access_dataset(group, key)
+        if tag_check is None:
+            tag_check = 'strict'
+
+        netcdf.validate_tag(cls, g, tag_check, "coords_tag")
+
+        flow_type = FlowType.from_netcdf(g)
+        data = {k: g[k][:] for k in flow_type._base_keys}
+
+        return cls(flow_type, data)
 
     def _validate_inputs(self, inputs):
         super()._validate_inputs(inputs)
@@ -200,13 +280,16 @@ class CoordStruct(DataStruct):
 @CoordStruct.implements(np.allclose)
 def allclose(dstruct1: CoordStruct, dstruct2: CoordStruct, *args, **kwargs):
     if dstruct1.index != dstruct2.index:
+        logger.debug("index doesn't not match")
         return False
 
     if dstruct1.flow_type != dstruct2.flow_type:
+        logger.debug("flow_type doesn't not match")
         return False
 
     for d1, d2 in zip(dstruct1._data, dstruct2._data):
         if not np.allclose(d1, d2, *args, **kwargs):
+            logger.debug("data do not match")
             return False
 
     return True

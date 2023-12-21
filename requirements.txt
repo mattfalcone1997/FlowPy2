@@ -2,3 +2,6 @@ numpy
 numba
 matplotlib
 scipy
+h5py
+netCDF4
+sympy

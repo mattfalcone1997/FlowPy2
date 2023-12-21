@@ -10,6 +10,8 @@ from flowpy.flow_type import (CartesianFlow,
                               PolarFlow)
 
 import pytest
+from flowpy.io import netcdf
+from test_hdf5 import test_filename
 
 
 @pytest.fixture()
@@ -122,6 +124,25 @@ def test_copy(test_dstruct):
     assert copy_test._data is not test_dstruct._data, "Check it has actually copied"
     for d1, d2 in zip(test_dstruct._data, copy_test._data):
         assert np.array_equal(d1, d2)
+
+
+def test_hdf(test_dstruct, test_filename):
+
+    test_dstruct.to_hdf(test_filename, 'w')
+
+    dstruct2 = test_dstruct.__class__.from_hdf(test_filename)
+
+    assert test_dstruct == dstruct2
+
+
+def test_netcdf(test_dstruct, test_filename):
+    f = netcdf.make_dataset(test_filename, 'w')
+    test_dstruct.to_netcdf(f)
+    f.close()
+
+    dstruct2 = test_dstruct.__class__.from_netcdf(test_filename)
+
+    assert test_dstruct == dstruct2
 
 
 @check_figures_equal()

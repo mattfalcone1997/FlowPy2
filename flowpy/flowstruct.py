@@ -8,7 +8,12 @@ from .indexers import CompIndexer, TimeIndexer
 from matplotlib.axes import Axes
 from .arrays import ArrayExtensionsBase, array_backends, ArrayBackends
 from .flow_type import FlowType
+
+import warnings
 import logging
+from .utils import find_stack_level
+
+from .io import hdf5, netcdf
 
 logger = logging.getLogger(__name__)
 
@@ -195,6 +200,9 @@ class FlowStructND(ArrayExtensionsBase):
         else:
             return array if not squeeze else np.squeeze(array)
 
+    def values(self):
+        return self._array
+
     def _validate_inputs(self, inputs):
         super()._validate_inputs(inputs)
         for x in inputs:
@@ -366,12 +374,126 @@ class FlowStructND(ArrayExtensionsBase):
 
             self._coords[k] += kwargs[k]
 
-    def to_hdf(self, fn: str, mode: str, key: str = None):
-        pass
+    def to_hdf(self, fn_or_obj: str, mode: str = None, key: str = None, compress=True):
+
+        g = hdf5.make_group(fn_or_obj, mode, key)
+
+        hdf5.set_type_tag(type(self), g)
+
+        compression = 'gzip' if compress else None
+        g.create_dataset("array", data=self._array,
+                         compression=compression)
+
+        self._comps.to_hdf(g, 'comps')
+        self._times.to_hdf(g, 'times')
+
+        self._coords.to_hdf(g, key='coords')
+
+        g.create_dataset("data_layout",
+                         data=np.array(self._data_layout, dtype=np.string_))
+
+        g.attrs['array_backend'] = self._array_backend
+        for k, v in self.attrs:
+            g.attrs[k] = v
+
+        if isinstance(fn_or_obj, hdf5.H5_Group_File):
+            return g
+        else:
+            g.file.close()
 
     @classmethod
-    def from_hdf(cls, fn: str, key: str = None) -> FlowStructND:
-        pass
+    def from_hdf(cls,
+                 fn_or_obj: str,
+                 key: str = None,
+                 comps: Iterable[str] = None,
+                 times: Iterable[Number] = None,
+                 tag_check=None) -> FlowStructND:
+
+        g = hdf5.access_group(fn_or_obj, key)
+        if tag_check is None:
+            tag_check = 'strict'
+
+        hdf5.validate_tag(cls, g, tag_check)
+
+        coords = CoordStruct.from_hdf(g, 'coords')
+        array = g['array'][:]
+        comps = CompIndexer.from_hdf(g, 'comps')
+        times = TimeIndexer.from_hdf(g, 'times')
+
+        attrs = dict(g.attrs)
+
+        data_layout = tuple([key.decode('utf-8')
+                            for key in g['data_layout'][:]])
+        array_backend = attrs['array_backend']
+
+        del attrs['array_backend']
+        del attrs['type_tag']
+
+        if not isinstance(fn_or_obj, hdf5.H5_Group_File):
+            g.file.close()
+
+        return FlowStructND(coords,
+                            array,
+                            comps,
+                            data_layout,
+                            times,
+                            time_decimals=times.decimals,
+                            array_backend=array_backend)
+
+    def to_netcdf(self, fn_or_obj: str, mode: str = None, key: str = None, compress=True):
+
+        if not netcdf.HAVE_NETCDF4:
+            raise ModuleNotFoundError("Cannot use netcdf")
+
+        g = netcdf.make_dataset(fn_or_obj, mode, key)
+        netcdf.set_type_tag(type(self), g)
+
+        g.array_backend = self._array_backend
+        self._coords.to_netcdf(g)
+
+        layout = []
+        if self._times is not None:
+            self._times.to_netcdf(g)
+            layout.append('time')
+        layout.extend(self._data_layout)
+
+        dtype = self._array.dtype.kind + str(self._array.dtype.itemsize)
+        for comp in self.comps:
+            var = g.createVariable(comp, dtype, tuple(layout))
+            var[:] = self.get(comp=comp).values()
+        g.data_layout = self._data_layout
+        g.comps = list(self._comps)
+        netcdf.close(g)
+
+    @classmethod
+    def from_netcdf(cls, fn_or_obj: str,
+                    key: str = None,
+                    comps: Iterable[str] = None,
+                    times: Iterable[Number] = None,
+                    tag_check=None) -> FlowStructND:
+
+        g = netcdf.access_dataset(fn_or_obj, key)
+        if tag_check is None:
+            tag_check = 'strict'
+
+        netcdf.validate_tag(cls, g, tag_check)
+
+        coords = CoordStruct.from_netcdf(g)
+        times = TimeIndexer.from_netcdf(g)
+        data_layout = g.data_layout
+
+        comps = list(g.comps)
+        array = [g.variables[comp][:] for comp in comps]
+        axis = 1 if times is not None else 0
+
+        array = np.stack(array, axis=axis)
+        return FlowStructND(coords,
+                            array,
+                            comps,
+                            data_layout,
+                            times,
+                            time_decimals=times.decimals,
+                            array_backend=g.array_backend)
 
     def _get_plot_data(self, dir_plane, loc, output_dim):
         dim = self.ndim - output_dim

@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 import warnings
 
 from .utils import find_stack_level
-
+from .io import hdf5, netcdf
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +83,8 @@ class CompIndexer(IndexBase):
 
         for ind in index:
             if not isinstance(ind, str):
-                raise IndexInitialisationError("Inputs must be of type str")
+                raise IndexInitialisationError("Inputs must be of type str "
+                                               f"not {type(ind)}")
 
         if len(index) != len(set(index)):
             raise ValueError("Indices cannot be repeated")
@@ -198,6 +199,18 @@ class CompIndexer(IndexBase):
                 raise KeyError(f"Key {v} already present")
             self._index[index] = v
             self.__accessor_update = True
+
+    def to_array(self):
+        return np.array(self._index, dtype=np.string_)
+
+    def to_hdf(self, h5_obj: hdf5.H5_Group_File, key: str):
+        h5_obj.create_dataset(key,
+                              data=np.array(self._index,
+                                            dtype=np.string_))
+
+    @classmethod
+    def from_hdf(cls, h5_obj: hdf5.H5_Group_File, key: str):
+        return cls([key.decode('utf-8') for key in h5_obj[key]])
 
     # def create_iterable_key(self, keys):
     #     if isinstance(keys, str):
@@ -409,11 +422,57 @@ class TimeIndexer(IndexBase, NDArrayOperatorsMixin):
 
         return out
 
+    def to_hdf(self, h5_obj: hdf5.H5_Group_File, key: str):
+        self.__update_accessor_dict()
+
+        d = h5_obj.create_dataset(key,
+                                  data=self._index)
+        if self._decimals is not None:
+            d.attrs['decimals'] = self._decimals
+
+    @classmethod
+    def from_hdf(cls, h5_obj: hdf5.H5_Group_File, key: str):
+        times = h5_obj[key][:]
+        if 'decimals' in h5_obj.keys():
+            decimals = h5_obj.attrs['decimals']
+        else:
+            decimals = None
+        return cls(times, decimals)
+
     def remove(self, keys: Union[Iterable[str], Number, slice]):
         index = self.get_other(keys)
 
         self._index = self._verify_index(self._index[index])
         self.__accessor_update = True
+
+    def to_netcdf(self, group):
+        if not netcdf.HAVE_NETCDF4:
+            raise ModuleNotFoundError("netCDF cannot be used")
+
+        group.createDimension("time", self._index.size)
+        dtype = self._index.dtype.kind + str(self._index.dtype.itemsize)
+        var = group.createVariable("time", dtype, ("time",))
+        var[:] = self._index
+        var.units = "seconds"
+
+        if self._decimals is not None:
+            var.decimals = self._decimals
+
+    @classmethod
+    def from_netcdf(cls, group):
+        if not netcdf.HAVE_NETCDF4:
+            raise ModuleNotFoundError("netCDF cannot be used")
+
+        if 'time' not in group.variables:
+            return None
+
+        time = group.variables['time'][:]
+        if hasattr(group.variables['time'], 'decimals'):
+            decimals = group.variables['time'].decimals
+        else:
+            decimals = None
+
+        return cls(time, decimals)
 
     @classmethod
     def implements(cls, np_func):

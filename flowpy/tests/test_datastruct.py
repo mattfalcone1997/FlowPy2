@@ -4,7 +4,7 @@ from flowpy.datastruct import (DataStruct,
                                logger)
 # from flowpy.arrays_old import GroupArray
 from flowpy.indexers import CompIndexer
-
+from test_hdf5 import test_filename
 import pytest
 
 
@@ -260,3 +260,13 @@ def test_sqrt():
         assert np.array_equal(v, np.sqrt(
             array[i])), "Test multiplication of datastructs"
         assert k == index[i], "Test multiplication of datastructs"
+
+
+def test_hdf(test_filename):
+    dstruct = return_dstruct()
+
+    dstruct.to_hdf(test_filename, 'w')
+
+    dstruct2 = dstruct.__class__.from_hdf(test_filename)
+
+    assert dstruct == dstruct2

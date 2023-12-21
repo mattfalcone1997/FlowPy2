@@ -9,6 +9,10 @@ from .arrays import ArrayExtensionsBase, array_backends
 from .indexers import CompIndexer
 from abc import ABC, abstractmethod
 
+from .io import hdf5
+import warnings
+from .utils import find_stack_level
+
 logger = logging.getLogger(__name__)
 
 
@@ -36,11 +40,60 @@ class DataStruct(ArrayExtensionsBase):
             return kwargs.get('dict_array')
 
     @classmethod
-    def from_hdf(self, fn, key=None):
-        pass
+    def from_hdf(cls, fn_or_obj, key=None, tag_check=None):
+        g = hdf5.access_group(fn_or_obj, key)
+        if tag_check is None:
+            tag_check = 'strict'
 
-    def to_hdf(self, fn, mode, key=None):
-        pass
+        hdf5.validate_tag(cls, g, tag_check)
+
+        index = CompIndexer.from_hdf(g, "index")
+        d = g['data']
+        data_array = d['data'][:]
+        shapes = d['shapes']
+        ndims = d['ndim'][:]
+
+        start = 0
+        stop = 0
+
+        arr_stop = 0
+        arr_start = 0
+
+        data = []
+
+        for ndim in ndims:
+            stop += ndim
+            shape = shapes[start:stop]
+            arr_stop += np.prod(shape)
+            item = data_array[arr_start:arr_stop].reshape(shape)
+            data.append(item)
+            start += ndim
+            arr_start += np.prod(shape)
+
+        array_backend = g.attrs['array_backend']
+
+        return DataStruct(data, index=index, array_backend=array_backend)
+
+    def to_hdf(self, fn_or_obj, mode=None, key=None):
+        g = hdf5.make_group(fn_or_obj, mode, key)
+        hdf5.set_type_tag(type(self), g)
+
+        index_array = self._index.to_hdf(g, "index")
+
+        d = g.create_group("data")
+        data = np.concatenate([d.flatten() for d in self._data], axis=0)
+        d.create_dataset("data", data=data)
+        d.create_dataset("ndim", data=np.array([d.ndim for d in self._data]))
+
+        shapes = np.concatenate([d.shape for d in self._data], axis=0)
+        d.create_dataset("shapes", data=shapes)
+
+        g.attrs['array_backend'] = self._array_backend
+
+        if isinstance(fn_or_obj, hdf5.H5_Group_File):
+            return g
+        else:
+            g.file.close()
 
     @property
     def index(self):
@@ -56,7 +109,10 @@ class DataStruct(ArrayExtensionsBase):
         if len(array) != len(index):
             raise ValueError("Index and array must be the same length")
         self._index = CompIndexer(index)
+
         creator = array_backends.get_creator(array_backend)
+
+        self._array_backend = array_backend
 
         array = [creator(arr, dtype=dtype, copy=copy) for arr in array]
         self._data = np.array(array, dtype=object)
@@ -166,10 +222,12 @@ class DataStruct(ArrayExtensionsBase):
 @DataStruct.implements(np.allclose)
 def allclose(dstruct1: DataStruct, dstruct2: DataStruct, *args, **kwargs):
     if dstruct1.index != dstruct2.index:
+        logger.debug("Indices do not match")
         return False
 
     for d1, d2 in zip(dstruct1._data, dstruct2._data):
         if not np.allclose(d1, d2, *args, **kwargs):
+            logger.debug("data do not match")
             return False
 
     return True
