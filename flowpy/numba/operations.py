@@ -16,8 +16,11 @@ def tdma_solve(ldiag, cdiag, rdiag, rhs):
     return _tdma_parallel_core(ldiag, cdiag, rdiag, rhs)
 
 
-@njit(parallel=True)
-def _tdma_parallel_core(ldiag, cdiag, rdiag, rhs):
+@njit(parallel=True, error_model='numpy', cache=True)
+def _tdma_parallel_core(ldiag: np.ndarray[np.floating],
+                        cdiag: np.ndarray[np.floating],
+                        rdiag: np.ndarray[np.floating],
+                        rhs: np.ndarray[np.floating]) -> np.ndarray[np.floating]:
 
     out = np.zeros_like(rhs)
 

@@ -1,10 +1,11 @@
 import numpy as np
 from numba import njit, prange
 from .operations import tdma_solve
+from ._utils import log_jit
 
 
-@njit(parallel=True)
-def gradient1_order2_dx(array, dx):
+@njit(parallel=True, error_model='numpy', cache=True)
+def gradient1_order2_dx(array: np.ndarray[np.floating], dx: float):
     gradient = np.zeros_like(array)
     idx = 1./dx
     for i in prange(array.shape[0]):
@@ -18,8 +19,8 @@ def gradient1_order2_dx(array, dx):
     return gradient
 
 
-@njit(parallel=True)
-def gradient1_order2_var_x(array, x):
+@njit(parallel=True, error_model='numpy', cache=True)
+def gradient1_order2_var_x(array: np.ndarray[np.floating], x: float):
     gradient = np.zeros_like(array)
 
     for i in prange(array.shape[0]):
@@ -52,8 +53,8 @@ def gradient1_order2_var_x(array, x):
     return gradient
 
 
-@njit(parallel=True)
-def gradient2_order2_dx(array, dx):
+@njit(parallel=True, error_model='numpy', cache=True)
+def gradient2_order2_dx(array: np.ndarray[np.floating], dx: float):
     gradient = np.zeros_like(array)
     idx2 = 1./(dx*dx)
     a = idx2
@@ -70,8 +71,8 @@ def gradient2_order2_dx(array, dx):
     return gradient
 
 
-@njit(parallel=True)
-def gradient2_order2_var_x(array, x):
+@njit(parallel=True, error_model='numpy', cache=True)
+def gradient2_order2_var_x(array: np.ndarray[np.floating], x: float):
     gradient = np.zeros_like(array)
     for i in prange(array.shape[0]):
         dx1 = x[1] - x[0]
@@ -103,8 +104,8 @@ def gradient2_order2_var_x(array, x):
     return gradient
 
 
-@njit(parallel=True)
-def _rhs_gradient1_order6_dx(array, dx):
+@njit(parallel=True, error_model='numpy', cache=True)
+def _rhs_gradient1_order6_dx(array: np.ndarray[np.floating], dx: float):
     idx = 1./dx
     a = 7.*idx/9.
     b = 1.*idx/36.
@@ -125,7 +126,7 @@ def _rhs_gradient1_order6_dx(array, dx):
     return rhs
 
 
-def gradient1_order6_dx(array, dx):
+def gradient1_order6_dx(array: np.ndarray[np.floating], dx: float):
 
     ldiag = np.zeros(array.shape[-1])
     cdiag = np.ones(array.shape[-1])
@@ -146,8 +147,8 @@ def gradient1_order6_dx(array, dx):
     return tdma_solve(ldiag, cdiag, rdiag, rhs)
 
 
-@njit(parallel=True)
-def _rhs_gradient2_order6_dx(array, dx):
+@njit(parallel=True, error_model='numpy', cache=True)
+def _rhs_gradient2_order6_dx(array: np.ndarray[np.floating], dx: float):
     idx2 = 1./(dx*dx)
     a = 12.*idx2/11.
     b = 3.*idx2/44
@@ -170,7 +171,7 @@ def _rhs_gradient2_order6_dx(array, dx):
     return rhs
 
 
-def gradient2_order6_dx(array, dx):
+def gradient2_order6_dx(array: np.ndarray[np.floating], dx: float):
     ldiag = np.zeros(array.shape[-1])
     cdiag = np.ones(array.shape[-1])
     rdiag = np.zeros(array.shape[-1])
@@ -190,8 +191,8 @@ def gradient2_order6_dx(array, dx):
     return tdma_solve(ldiag, cdiag, rdiag, rhs)
 
 
-@njit(parallel=True)
-def _rhs_gradient1_order6_var_x(array, dx_array):
+@njit(parallel=True, error_model='numpy', cache=True)
+def _rhs_gradient1_order6_var_x(array: np.ndarray[np.floating], dx_array: np.ndarray[np.floating]):
 
     rhs = np.zeros_like(array)
     # point 0
@@ -232,7 +233,7 @@ def _rhs_gradient1_order6_var_x(array, dx_array):
     return rhs
 
 
-def gradient1_order6_var_x(array, x):
+def gradient1_order6_var_x(array: np.ndarray[np.floating], x: np.ndarray[np.floating]):
     ldiag = np.zeros(array.shape[-1])
     cdiag = np.ones(array.shape[-1])
     rdiag = np.zeros(array.shape[-1])
@@ -255,8 +256,8 @@ def gradient1_order6_var_x(array, x):
     return tdma_solve(ldiag, cdiag, rdiag, rhs)
 
 
-@njit(parallel=True)
-def _rhs_gradient2_order6_var_x(array, dx_array):
+@njit(parallel=True, error_model='numpy', cache=True)
+def _rhs_gradient2_order6_var_x(array: np.ndarray[np.floating], dx_array: np.ndarray[np.floating]):
 
     rhs = np.zeros_like(array)
     # point 0
@@ -297,7 +298,7 @@ def _rhs_gradient2_order6_var_x(array, dx_array):
     return rhs
 
 
-def gradient2_order6_var_x(array, x):
+def gradient2_order6_var_x(array: np.ndarray[np.floating], x: np.ndarray[np.floating]):
     ldiag = np.zeros(array.shape[-1])
     cdiag = np.ones(array.shape[-1])
     rdiag = np.zeros(array.shape[-1])
@@ -318,3 +319,13 @@ def gradient2_order6_var_x(array, x):
     rhs = _rhs_gradient2_order6_var_x(array, dx_array)
 
     return tdma_solve(ldiag, cdiag, rdiag, rhs)
+
+
+log_jit(gradient1_order2_dx)
+log_jit(gradient1_order2_var_x)
+log_jit(gradient2_order2_dx)
+log_jit(gradient2_order2_var_x)
+log_jit(_rhs_gradient1_order6_dx)
+log_jit(_rhs_gradient2_order6_dx)
+log_jit(_rhs_gradient1_order6_var_x)
+log_jit(_rhs_gradient2_order6_var_x)
