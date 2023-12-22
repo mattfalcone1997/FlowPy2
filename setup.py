@@ -13,7 +13,7 @@ def main():
     long_description_content_type = "text/markdown"
     author = 'Matthew A. Falcone'
     packages = find_packages(where='.')
-    python_requires = ">=3.7, <4"
+    python_requires = ">=3.9, <4"
     install_requires = ['numpy',
                         'matplotlib',
                         'numba',
