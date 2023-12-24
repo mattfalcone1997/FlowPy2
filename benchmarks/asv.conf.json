@@ -1,7 +1,10 @@
 {
     "version": 1,
     "project" : "FlowPy",
+    "project_url": "https://github.com/mattfalcone1997/FlowPy2",
     "repo": "..",
+    "branches": ["HEAD"],
+    "show_commit_url": "http://github.com/mattfalcone1997/FlowPy2/commit/",
     "environment_type": "virtualenv",
     "dvcs": "git",
     "matrix": {

@@ -9,12 +9,15 @@ def gradient1_order2_dx(array: np.ndarray[np.floating], dx: float):
     gradient = np.zeros_like(array)
     idx = 1./dx
     for i in prange(array.shape[0]):
+
         gradient[i, 0] = idx * \
             (-1.5*array[i, 0] + 2.*array[i, 1] - 0.5*array[i, 2])
+
         for j in prange(1, array.shape[-1]-1):
-            gradient[i, j] = 0.5*idx*(array[i, j+1] - array[i, j-1])
+            gradient[i, j] = 0.5*idx*(- array[i, j-1] + array[i, j+1])
+
         gradient[i, -1] = idx * \
-            (1.5*array[i, -1] - 2.*array[i, -2] + 0.5*array[i, -3])
+            (0.5*array[i, -3] - 2.*array[i, -2] + 1.5*array[i, -1])
 
     return gradient
 

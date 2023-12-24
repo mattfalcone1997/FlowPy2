@@ -1,62 +1,63 @@
 import numpy as np
-from .common import BenchMark
+from .common import (BenchMark,
+                     get_params)
 import flowpy.gradient as gr
 import flowpy.numba.gradient as nbgr
+import numba
 
 
-class _GradientsTestSuite(BenchMark):
-    _array_size = None
-    _grad_size = 500
-    _dx = 0.01
-    _x = np.linspace(0, 1, _grad_size)
+class suite_gradients_numba(BenchMark):
 
-    def setup(self):
-        self._array = np.random.randn(self._array_size, self._grad_size)
+    def setup(self, n, nthread):
+        numba.set_num_threads(nthread)
 
-    def time_gradient1_order2_dx(self):
-        nbgr.gradient1_order2_dx(self._array, self._dx)
+        self.grad_size = 500
+        self.dx = 0.01
+        self.array = np.random.randn(n, self.grad_size)
 
-    def time_gradient2_order2_dx(self):
-        nbgr.gradient2_order2_dx(self._array, self._dx)
+        self.array_t = self.array.T
+        self.x = np.linspace(0, 1, self.grad_size)
 
-    def time_numpy_gradient1_dx(self):
-        np.gradient(self._array, self._dx)
+    def time_gradient1_order2_dx(self, n, nthread):
+        nbgr.gradient1_order2_dx(self.array, self.dx)
 
-    def time_gradient1_order2_var_x(self):
-        nbgr.gradient1_order2_var_x(self._array, self._x)
+    def time_gradient2_order2_dx(self, n, nthread):
+        nbgr.gradient2_order2_dx(self.array, self.dx)
 
-    def time_gradient2_order2_var_x(self):
-        nbgr.gradient2_order2_var_x(self._array, self._x)
+    def time_numpy_gradient1_dx(self, n, nthread):
+        np.gradient(self.array, self.dx, axis=-1)
 
-    def time_numpy_gradient1_var_x(self):
-        np.gradient(self._array, self._x)
+    def time_numpy_gradient1_dx_outer(self, n, nthread):
+        np.gradient(self.array_t, self.dx, axis=0)
 
-    def time_gradient1_order6_dx(self):
-        nbgr.gradient1_order6_dx(self._array, self._dx)
+    def time_gradient1_order2_var_x(self, n, nthread):
+        nbgr.gradient1_order2_var_x(self.array, self.x)
 
-    def time_gradient2_order6_dx(self):
-        nbgr.gradient2_order6_dx(self._array, self._dx)
+    def time_gradient2_order2_var_x(self, n, nthread):
+        nbgr.gradient2_order2_var_x(self.array, self.x)
 
-    def time_gradient2_order6_dx(self):
-        nbgr.gradient2_order6_dx(self._array, self._dx)
+    def time_numpy_gradient1_var_x(self, n, nthread):
+        np.gradient(self.array, self.x.squeeze(), axis=-1)
 
-    def time_gradient1_order6_var_x(self):
-        nbgr.gradient1_order6_var_x(self._array, self._x)
+    def time_numpy_gradient1_var_x_outer(self, n, nthread):
+        np.gradient(self.array_t, self.x.squeeze(), axis=0)
 
-    def time_gradient2_order6_var_x(self):
-        nbgr.gradient2_order6_var_x(self._array, self._x)
+    def time_gradient1_order6_dx(self, n, nthread):
+        nbgr.gradient1_order6_dx(self.array, self.dx)
 
-    def time_gradient2_order6_var_x(self):
-        nbgr.gradient2_order6_var_x(self._array, self._x)
+    def time_gradient2_order6_dx(self, n, nthread):
+        nbgr.gradient2_order6_dx(self.array, self.dx)
 
-
-class smallGradientsTestSuite(BenchMark):
-    _array_size = 1
+    def time_gradient2_order6_dx(self, n, nthread):
+        nbgr.gradient2_order6_dx(self.array, self.dx)
 
 
-class medGradientsTestSuite(BenchMark):
-    _array_size = 500
+suite_gradients_numba.params = get_params()
+# def time_gradient1_order6_var_x(self, n):
+#     nbgr.gradient1_order6_var_x(self.array, self.x)
 
+# def time_gradient2_order6_var_x(self, n):
+#     nbgr.gradient2_order6_var_x(self.array, self.x)
 
-class largeGradientsTestSuite(BenchMark):
-    _array_size = 5000
+# def time_gradient2_order6_var_x(self, n):
+#     nbgr.gradient2_order6_var_x(self.array, self.x)
