@@ -10,6 +10,10 @@ def tdma_solve(ldiag, cdiag, rdiag, rhs):
         raise ValueError("left and right diagonals should be equal"
                          " length compared with cdiag")
 
+    if len(ldiag) != rhs.shape[-1]:
+        raise ValueError("Diagonals should be the same length as the "
+                         "right-most dimension of the rhs array")
+
     if rhs.ndim != 2:
         raise ValueError("This method only works on two dimensions")
 

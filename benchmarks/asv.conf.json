@@ -1,0 +1,16 @@
+{
+    "version": 1,
+    "project" : "FlowPy",
+    "repo": "..",
+    "environment_type": "virtualenv",
+    "dvcs": "git",
+    "matrix": {
+        "numba": [],
+        "numpy":[],
+        "sympy":[],
+        "h5py":[],
+        "matplotlib":[]
+    },
+    "pythons": ["3.9", "3.11"]
+
+}

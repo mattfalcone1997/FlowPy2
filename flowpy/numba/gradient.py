@@ -34,20 +34,20 @@ def gradient1_order2_var_x(array: np.ndarray[np.floating], x: float):
         gradient[i, 0] = a*array[i, 0] + b*array[i, 1] + c*array[i, 2]
 
         for j in prange(1, array.shape[-1]-1):
-            dx1 = x[j+1] - x[j]
-            dx2 = x[j] - x[j-1]
+            dx1 = x[j] - x[j-1]
+            dx2 = x[j+1] - x[j]
 
-            a = -dx2*(dx1*(dx1 + dx2))
-            b = (-dx1 + dx2)*(dx1*dx2)
-            c = dx1/dx2*(dx1 + dx2)
+            a = -dx2/(dx1*(dx1 + dx2))
+            b = (-dx1 + dx2)/(dx1*dx2)
+            c = dx1/(dx2*(dx1 + dx2))
             gradient[i, j] = a*array[i, j-1] + b*array[i, j] + c*array[i, j+1]
 
-        dx1 = x[-3] - x[-2]
-        dx2 = x[-2] - x[-1]
+        dx1 = x[-2] - x[-3]
+        dx2 = x[-1] - x[-2]
 
-        a = -dx2/(dx1*(dx1 + dx2))
+        a = dx2/(dx1*(dx1 + dx2))
         b = -(dx1 + dx2)/(dx1*dx2)
-        c = -(2*dx2 + dx1)/(dx2*(dx1 + dx2))
+        c = (2*dx2 + dx1)/(dx2*(dx1 + dx2))
 
         gradient[i, -1] = a*array[i, -3] + b*array[i, -2] + c*array[i, -1]
     return gradient
@@ -61,12 +61,12 @@ def gradient2_order2_dx(array: np.ndarray[np.floating], dx: float):
     b = -2.*idx2
     c = idx2
     for i in prange(array.shape[0]):
-        gradient[i, 0] = a*array[i, 0] + b*array[i, 1] - c*array[i, 2]
+        gradient[i, 0] = a*array[i, 0] + b*array[i, 1] + c*array[i, 2]
 
         for j in prange(1, array.shape[-1]-1):
-            gradient[i, j] = a*array[i, j+1] + b*array[i, j] + c*array[i, j-1]
+            gradient[i, j] = a*array[i, j-1] + b*array[i, j] + c*array[i, j+1]
 
-        gradient[i, -1] = a*array[i, -3] - b*array[i, -2] + c*array[i, -1]
+        gradient[i, -1] = a*array[i, -3] + b*array[i, -2] + c*array[i, -1]
 
     return gradient
 
@@ -85,8 +85,8 @@ def gradient2_order2_var_x(array: np.ndarray[np.floating], x: float):
         gradient[i, 0] = a*array[i, 0] + b*array[i, 1] + c*array[i, 2]
 
         for j in prange(1, array.shape[-1]-1):
-            dx1 = x[j+1] - x[j]
-            dx2 = x[j] - x[j-1]
+            dx1 = x[j] - x[j-1]
+            dx2 = x[j+1] - x[j]
 
             a = 2./(dx1*(dx1 + dx2))
             b = -2/(dx1*dx2)
@@ -109,9 +109,10 @@ def _rhs_gradient1_order6_dx(array: np.ndarray[np.floating], dx: float):
     idx = 1./dx
     a = 7.*idx/9.
     b = 1.*idx/36.
+
     rhs = np.zeros_like(array)
     rhs[:, 0] = idx*(-2.5*array[:, 0] + 2.*array[:, 1] + 0.5*array[:, 2])
-    rhs[:, 1] = idx*(0.75/dx)*(array[:, 0] - array[:, 2])
+    rhs[:, 1] = 0.75*idx*(array[:, 2] - array[:, 0])
 
     # boundary at n, n-1
 
@@ -160,8 +161,8 @@ def _rhs_gradient2_order6_dx(array: np.ndarray[np.floating], dx: float):
 
     # boundary at n, n-1
 
-    rhs[:, -1] = idx2*(-13.*array[:, 0] + 27.*array[:, 1] -
-                       15.*array[:, 2] + array[:, 3])
+    rhs[:, -1] = idx2*(13.*array[:, -1] - 27.*array[:, -2] +
+                       15.*array[:, -3] - array[:, -4])
     rhs[:, -2] = 1.2*idx2*(array[:, -3] - 2.*array[:, -2] + array[:, -1])
 
     # middle
