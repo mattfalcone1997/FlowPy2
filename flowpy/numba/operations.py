@@ -37,16 +37,17 @@ def _tdma_parallel_core(ldiag: np.ndarray[np.floating],
     b1[0] = cdiag[0]
     for i in range(1, n):
         w[i] = ldiag[i]/b1[i-1]
-        b1[i] = cdiag[i]-w[i]*rdiag[i-1]
+        b1[i] = -w[i]*rdiag[i-1] + cdiag[i]
 
+    ib1 = 1./b1
     for j in prange(rhs.shape[0]):
         d = np.zeros(n, ldiag.dtype)
         d[0] = rhs[j, 0]
         for i in range(1, n):
-            d[i] = rhs[j, i]-w[i]*d[i-1]
+            d[i] = -d[i-1]*w[i] + rhs[j, i]
 
-        out[j, n-1] = d[n-1]/b1[n-1]
+        out[j, n-1] = d[n-1]*ib1[n-1]
         for i in range(n-2, -1, -1):
-            out[j, i] = (d[i]-rdiag[i]*out[j, i+1])/b1[i]
+            out[j, i] = (-out[j, i+1]*rdiag[i] + d[i])*ib1[i]
 
     return out

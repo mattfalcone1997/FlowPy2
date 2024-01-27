@@ -442,3 +442,21 @@ def test_contourf(fig_test, fig_ref, reference_fstruct):
     z = reference_fstruct.get(y=1, comp='u', time=100)
 
     ax1.contourf(y, x, z)
+
+
+def test_first_derivative(reference_fstruct):
+
+    data = reference_fstruct.first_derivative('u', 'x')
+    assert data.shape == (3, 200, 50, 100)
+
+    data = reference_fstruct.first_derivative('u', 'x', time=100)
+    assert data.shape == (200, 50, 100)
+
+
+def test_second_derivative(reference_fstruct):
+
+    data = reference_fstruct.second_derivative('u', 'x')
+    assert data.shape == (3, 200, 50, 100)
+
+    data = reference_fstruct.second_derivative('u', 'x', time=100)
+    assert data.shape == (200, 50, 100)

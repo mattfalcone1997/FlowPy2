@@ -83,7 +83,7 @@ def _prepare_parallel(array, axis):
     else:
         arr = np.moveaxis(array, axis, -1)
         s = np.prod(arr.shape[:-1])
-        return s.reshape((s, arr.shape[-1]))
+        return arr.reshape((s, arr.shape[-1]))
 
 
 def _prepare_return(gradient, array_org, axis):
@@ -92,7 +92,7 @@ def _prepare_return(gradient, array_org, axis):
     else:
         shape1 = list(array_org.shape)
         del shape1[axis]
-        shape1.append(array_org.shape[-1])
+        shape1.append(gradient.shape[-1])
         gradient = gradient.reshape(shape1)
         return np.moveaxis(gradient, -1, axis)
 

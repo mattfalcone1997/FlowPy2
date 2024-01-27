@@ -200,3 +200,23 @@ def test_contour(fig_test, fig_ref, test_dstruct):
 
     ax2 = fig_test.subplots()
     test_dstruct.contour('xy', data, ax=ax2)
+
+
+def test_first_derivative(test_dstruct: CoordStruct):
+    array = np.linspace(0, 100, 100)
+
+    test_dstruct.first_derivative('x', array)
+
+    array1 = np.random.randn(10, 100, 20)
+
+    test_dstruct.first_derivative('x', array1, axis=1)
+
+
+def test_second_derivative(test_dstruct: CoordStruct):
+    array = np.linspace(0, 100, 100)
+
+    test_dstruct.second_derivative('x', array)
+
+    array1 = np.random.randn(10, 100, 20)
+
+    test_dstruct.second_derivative('x', array1, axis=1)

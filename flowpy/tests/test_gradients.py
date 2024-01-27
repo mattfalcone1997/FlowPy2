@@ -31,6 +31,14 @@ def test_first_derivative():
 
     gradient.first_derivative(array, dx, method='numba6', axis=0)
 
+    array1 = np.random.randn(10, 100, 20)
+
+    grad1 = gradient.first_derivative(array1, dx, method='numpy', axis=1)
+    assert array1.shape == grad1.shape
+    gradient.first_derivative(array1, dx, method='numba2', axis=1)
+
+    gradient.first_derivative(array1, dx, method='numba6', axis=1)
+
 
 def test_second_derivative():
     array = np.linspace(0, 100)
@@ -44,3 +52,12 @@ def test_second_derivative():
 
     gradient.second_derivative(array, dx, method='numba6', axis=0)
     gradient.second_derivative(array, dx, method='numba6', axis=0)
+
+    array1 = np.random.randn(10, 100, 20)
+
+    grad1 = gradient.second_derivative(array1, dx, method='numpy', axis=1)
+    assert array1.shape == grad1.shape
+
+    gradient.second_derivative(array1, dx, method='numba2', axis=1)
+
+    gradient.second_derivative(array1, dx, method='numba6', axis=1)

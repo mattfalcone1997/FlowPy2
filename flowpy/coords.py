@@ -258,11 +258,12 @@ class CoordStruct(DataStruct):
 
     def first_derivative(self, comp, data, axis=0, method=None):
         coords = self.get(comp)
-        return first_derivative(data, coords, axis=axis, methof=method)
+        return first_derivative(data, coords, axis=axis, method=method)
 
     def second_derivative(self, comp, data, axis=0, method=None):
         coords = self.get(comp)
-        return second_derivative(data, coords, axis=axis, methof=method)
+
+        return second_derivative(data, coords, axis=axis, method=method)
 
     def integrate(self, comp, data, axis=0, method=None):
         pass

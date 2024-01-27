@@ -658,6 +658,24 @@ class FlowStructND(ArrayExtensionsBase):
                                    fig_kw=fig_kw,
                                    **contour_kw)
 
+    def first_derivative(self, comp: str,
+                         axis: str,
+                         time: float = None,
+                         method: str = None) -> ArrayLike:
+        axis_index = self._data_layout.index(axis) + 2
+        data = self.get(time=time, comp=comp, squeeze=False, output_fs=False)
+
+        return self.coords.first_derivative(axis, data, axis_index, method=method).squeeze()
+
+    def second_derivative(self, comp: str,
+                          axis: str,
+                          time: float = None,
+                          method: str = None) -> ArrayLike:
+        axis_index = self._data_layout.index(axis) + 2
+        data = self.get(time=time, comp=comp, squeeze=False, output_fs=False)
+
+        return self.coords.second_derivative(axis, data, axis_index, method=method).squeeze()
+
 
 @FlowStructND.implements(np.array_equal)
 def array_equal(fstruct1: FlowStructND, fstruct2: FlowStructND, *args, **kwargs):
