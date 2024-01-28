@@ -158,7 +158,7 @@ register_gradient('numba6', numba_gradient1_order6,
                   numba_gradient2_order6)
 
 
-def compute_FD_stencil(derivative, rhs_stencil, lhs_stencil=None, subs=None, use_rational=True, simplify=True):
+def compute_FD_stencil(derivative, rhs_stencil, lhs_stencil=None, subs=None, use_rational=True, simplify=True, method='GJ'):
     rhs_stencil = np.array(rhs_stencil)
     if lhs_stencil is None:
         lhs_stencil = [0]
@@ -235,7 +235,7 @@ def compute_FD_stencil(derivative, rhs_stencil, lhs_stencil=None, subs=None, use
     mat = sympy.Matrix(rows)
     rhs_vec = sympy.Matrix([0]*(nrows))
     rhs_vec[derivative] = 1
-    sol = mat.LUsolve(rhs_vec)
+    sol = mat.solve(rhs_vec, method=method)
 
     if subs is not None:
         dx_names = [dx.name for dx in dx_list]
