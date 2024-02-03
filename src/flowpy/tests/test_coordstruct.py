@@ -6,8 +6,7 @@ from matplotlib.testing.decorators import check_figures_equal
 
 from flowpy.coords import (CoordStruct,
                            logger)
-from flowpy.flow_type import (CartesianFlow,
-                              PolarFlow)
+from flowpy.flow_type import register_flow_type
 
 import pytest
 from flowpy.io import netcdf
@@ -34,7 +33,7 @@ def test_dstruct():
             np.arange(200, dtype='f8')]
 
     index = ['x', 'y', 'z']
-    return CoordStruct(CartesianFlow,
+    return CoordStruct("Cartesian",
                        data,
                        index=index)
 
@@ -44,7 +43,7 @@ def test_ascending(test_data, test_index):
     data[0] = test_data[0][::-1]
 
     with pytest.raises(ValueError):
-        CoordStruct(CartesianFlow,
+        CoordStruct("Cartesian",
                     data,
                     index=test_index)
 
@@ -145,6 +144,13 @@ def test_netcdf(test_dstruct, test_filename):
     assert test_dstruct == dstruct2
 
 
+def test_subplots(test_dstruct: CoordStruct):
+
+    fig, ax = test_dstruct._flow_type.subplots()
+
+    assert hasattr(ax, 'normalise')
+
+
 @check_figures_equal()
 def test_line_plots(fig_test, fig_ref, test_dstruct):
 
@@ -220,3 +226,7 @@ def test_second_derivative(test_dstruct: CoordStruct):
     array1 = np.random.randn(10, 100, 20)
 
     test_dstruct.second_derivative('x', array1, axis=1)
+
+
+def test_to_vtk(test_dstruct: CoordStruct):
+    test_dstruct.to_vtk()

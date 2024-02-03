@@ -1,7 +1,10 @@
 numpy
 numba
-matplotlib
+matplotlib >= 3.0
 scipy
 h5py
 netCDF4
 sympy
+pyvista
+vtk >= 9.1
+cython

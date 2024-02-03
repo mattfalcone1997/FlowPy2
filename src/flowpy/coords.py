@@ -1,24 +1,24 @@
 from .io import hdf5, netcdf
 import numpy as np
-import matplotlib.pyplot as plt
+from .plotting import subplots
 import logging
 from typing import Sequence, Union, Callable, Mapping
 from numbers import Number
 
 from .datastruct import DataStruct
-from .flow_type import FlowType
+from .flow_type import get_flow_type
 from .gradient import (first_derivative,
                        second_derivative)
 from .indexers import CompIndexer
+
+from pyvista import StructuredGrid
 logger = logging.getLogger(__name__)
 
 
 class CoordStruct(DataStruct):
-    def __init__(self, flow_type: FlowType, *args, **kwargs):
-        if not isinstance(flow_type, FlowType):
-            raise TypeError(f"flow_type ust be an instance of FlowTypeBase")
+    def __init__(self, flow_type: str, *args, **kwargs):
 
-        self._flow_type = flow_type
+        self._flow_type = get_flow_type(flow_type)
 
         super().__init__(*args, **kwargs)
         self._flow_type.validate_keys(self.index)
@@ -36,7 +36,7 @@ class CoordStruct(DataStruct):
 
         g = super().to_hdf(g)
 
-        self._flow_type.to_hdf(g, key='flow_type')
+        g.attrs['flow_type'] = self._flow_type.name
 
         if isinstance(fn_or_obj, hdf5.H5_Group_File):
             return g
@@ -76,7 +76,7 @@ class CoordStruct(DataStruct):
 
         array_backend = g.attrs['array_backend']
 
-        flow_type = FlowType.from_hdf(g, key='flow_type')
+        flow_type = g.attrs['flow_type']
         return CoordStruct(flow_type, data, index=index, array_backend=array_backend)
 
     def to_netcdf(self, group):
@@ -85,7 +85,7 @@ class CoordStruct(DataStruct):
 
         netcdf.set_type_tag(type(self), group, "coords_tag")
 
-        self._flow_type.to_netcdf(group)
+        group.flow_type = self._flow_type.name
         for key in self.index:
             data = self.get(key)
             group.createDimension(key, data.size)
@@ -104,10 +104,10 @@ class CoordStruct(DataStruct):
 
         netcdf.validate_tag(cls, g, tag_check, "coords_tag")
 
-        flow_type = FlowType.from_netcdf(g)
+        flow_type = get_flow_type(g.flow_type)
         data = {k: g[k][:] for k in flow_type._base_keys}
 
-        return cls(flow_type, data)
+        return cls(flow_type.name, data)
 
     def _validate_inputs(self, inputs):
         super()._validate_inputs(inputs)
@@ -123,19 +123,12 @@ class CoordStruct(DataStruct):
     def rescale(self, key: str, val: Number):
         self._data[key] /= val
 
-    def _create_axis(self, fig_kw):
-        logger.debug("Create axis in plot_line")
-
-        if fig_kw is None:
-            fig_kw = {}
-        fig_kw.update({'projection': self.flow_type.projection})
-        return plt.subplots(**fig_kw)
-
     def plot_line(self, comp: str, data: Sequence, ax=None,
                   transform_xdata: Callable = None,
                   fig_kw=None, **kwargs):
+
         if ax is None:
-            fig, ax = self._create_axis(fig_kw)
+            fig, ax = self._flow_type.subplots(**fig_kw)
 
         coords = self.get(comp)
 
@@ -177,7 +170,7 @@ class CoordStruct(DataStruct):
                 fig_kw=None, **kwargs):
 
         if ax is None:
-            fig, ax = self._create_axis(fig_kw)
+            fig, ax = self._flow_type.subplots(**fig_kw)
 
         xcoords, ycoords = self._get_coords_contour(plane, transform_xdata,
                                                     transform_ydata)
@@ -188,8 +181,9 @@ class CoordStruct(DataStruct):
                  transform_xdata=None,
                  transform_ydata=None,
                  fig_kw=None, **kwargs):
+
         if ax is None:
-            fig, ax = self._create_axis(fig_kw)
+            fig, ax = self._flow_type.subplots(**fig_kw)
 
         xcoords, ycoords = self._get_coords_contour(plane, transform_xdata,
                                                     transform_ydata)
@@ -200,8 +194,9 @@ class CoordStruct(DataStruct):
                    transform_xdata=None,
                    transform_ydata=None,
                    fig_kw: Mapping = None, **kwargs):
+
         if ax is None:
-            fig, ax = self._create_axis(fig_kw)
+            fig, ax = self._flow_type.subplots(**fig_kw)
 
         xcoords, ycoords = self._get_coords_contour(plane, transform_xdata,
                                                     transform_ydata)
@@ -275,7 +270,21 @@ class CoordStruct(DataStruct):
         pass
 
     def copy(self):
-        return self.__class__(self._flow_type, self.to_dict(), copy=True)
+        return self.__class__(self._flow_type.name, self.to_dict(), copy=True)
+
+    def to_vtk(self):
+        cart_grid = self._flow_type.transform(self)
+
+        x = cart_grid['x']
+        y = cart_grid['y']
+        z = cart_grid['z']
+
+        shape = (x.size, y.size, z.size)
+        X = np.ones(shape)*x[:, None, None]
+        Y = np.ones(shape)*y[None, :, None]
+        Z = np.ones(shape)*z[None, None, :]
+
+        return StructuredGrid(X, Y, Z)
 
 
 @CoordStruct.implements(np.allclose)

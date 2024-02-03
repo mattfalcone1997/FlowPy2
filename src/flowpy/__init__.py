@@ -1,6 +1,6 @@
 from .flow_type import (FlowType,
-                        CartesianFlow,
-                        PolarFlow)
+                        register_flow_type,
+                        get_flow_type)
 from .coords import CoordStruct
 from .indexers import CompIndexer, TimeIndexer
 from .datastruct import DataStruct

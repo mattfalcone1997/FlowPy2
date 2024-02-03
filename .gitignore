@@ -10,3 +10,4 @@ result_images
 benchmarks/results
 benchmarks/env
 benchmarks/FlowPy
+**/*.c

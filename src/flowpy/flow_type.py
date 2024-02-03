@@ -2,8 +2,10 @@ from .io import hdf5
 import numpy as np
 import logging
 from abc import ABC, abstractproperty
-from typing import Tuple
+from typing import Tuple, Callable, Mapping
 from matplotlib.projections import get_projection_class
+from .plotting import subplots
+
 _symbols = {'CHANNEL': 0,
             'BLAYER': 1}
 
@@ -16,7 +18,11 @@ logger = logging.getLogger(__name__)
 # laplacians, divergences etc
 
 class FlowType:
-    def __init__(self, name: str, keys: Tuple[str], projection: str = None, symbols: dict = None):
+    def __init__(self, name: str, keys: Tuple[str],
+                 projection: str = None,
+                 symbols: dict = None,
+                 transform_cartesian: Callable = None):
+
         self._projection = projection
         if not all(isinstance(key, str) for key in keys):
             raise TypeError("All keys must be of type str")
@@ -31,9 +37,48 @@ class FlowType:
         if symbols is not None:
             self._symbols.update(symbols)
 
+        self._transform_cartesian = self._validate_transform(
+            transform_cartesian)
+
+    def _validate_transform(self, transform_cartesian: Callable):
+
+        if transform_cartesian is not None:
+            if not callable(transform_cartesian):
+                raise TypeError("transform_cartesian must be callable or None")
+
+        else:
+            return None
+
+        input_data = {key: np.zeros(100) for key in self._base_keys}
+
+        try:
+            out_data = transform_cartesian(input_data)
+        except Exception as e:
+
+            raise ValueError("transform_cartesian produced "
+                             f"error: {e.args[0]}") from None
+
+        if not isinstance(out_data, Mapping):
+            raise TypeError("transform_cartesian must return a Mapping")
+
+        if not all(k in ['x', 'y', 'z'] for k in out_data.keys()):
+            raise ValueError("Keys in ouput not in base keys")
+
+        return transform_cartesian
+
+    def transform(self, input_grid):
+        if self._transform_cartesian is None:
+            return input_grid
+        else:
+            return self._transform_cartesian(input_grid)
+
     @property
     def symbols(self):
         return self._symbols
+
+    @property
+    def name(self):
+        return self._name
 
     @abstractproperty
     def Transform(self):
@@ -137,6 +182,47 @@ class FlowType:
                    projection=projection,
                    symbols=attrs)
 
+    def subplots(self, *args, **kwargs):
+        subplots_kw = kwargs.get('subplot_kw', {})
+        subplots_kw['projection'] = self.projection
 
-CartesianFlow = FlowType("Cartesian", ('x', 'y', 'z'))
-PolarFlow = FlowType("Polar", ('z', 'r', 'theta'), projection='polar')
+        kwargs['subplot_kw'] = subplots_kw
+
+        return subplots(*args, **kwargs)
+
+
+_flow_types = {}
+
+
+def register_flow_type(flow_type: FlowType):
+    if flow_type.name in _flow_types:
+        raise KeyError(f"Name {flow_type.name} is already a flow_type")
+
+    _flow_types[flow_type.name] = flow_type
+
+
+def get_flow_type(name) -> FlowType:
+    if name not in _flow_types:
+        raise ValueError("Invalid flow type name. Available "
+                         f"flow types: {list(_flow_types.keys())}")
+
+    return _flow_types[name]
+
+
+register_flow_type(FlowType("Cartesian",
+                            ('x', 'y', 'z'),
+                            projection='FlowAxes'))
+
+
+def _polar_to_cartesian(polar_data: Mapping):
+    x = polar_data['z']
+    y = polar_data['r']*np.sin(polar_data['theta'])
+    z = polar_data['r']*np.cos(polar_data['theta'])
+
+    return {'x': x, 'y': y, 'z': z}
+
+
+register_flow_type(FlowType("Polar",
+                            ('z', 'r', 'theta'),
+                            projection='polar',
+                            transform_cartesian=_polar_to_cartesian))

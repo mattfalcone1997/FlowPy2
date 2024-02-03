@@ -193,7 +193,8 @@ class FlowStructND(ArrayExtensionsBase):
         if out_fs and output_fs:
             times = self.times[indexer[0]]
             comps = self._comps[indexer[1]]
-            coords = self._coords.__class__(self.flow_type, coord_dict)
+            coords = self._coords.__class__(self.flow_type.name,
+                                            coord_dict)
 
             return self._construct_fstruct(coords, array, times, comps, data_layout)
 
@@ -675,6 +676,20 @@ class FlowStructND(ArrayExtensionsBase):
         data = self.get(time=time, comp=comp, squeeze=False, output_fs=False)
 
         return self.coords.second_derivative(axis, data, axis_index, method=method).squeeze()
+
+    def to_vtk(self, time=None, comps=None):
+
+        grid = self.coords.to_vtk()
+        if (self.times is not None or len(self.times) > 1) and time is None:
+            raise ValueError("There are multiple times, time must be present")
+
+        if comps is None:
+            comps = self.comps
+
+        for comp in comps:
+            grid.point_data[comp] = np.ravel(self.get(time=time, comp=comp))
+
+        return grid
 
 
 @FlowStructND.implements(np.array_equal)

@@ -1,6 +1,6 @@
 from flowpy.flowstruct import FlowStructND
 from flowpy.coords import CoordStruct
-from flowpy.flow_type import CartesianFlow
+from flowpy.flow_type import get_flow_type
 from matplotlib.testing.decorators import check_figures_equal
 
 import pytest
@@ -15,7 +15,7 @@ def reference_fstruct():
     data = {'x': np.linspace(0, 100, 200),
             'y': np.linspace(0, 2, 50),
             'z': np.linspace(0, 6, 100)}
-    coords = CoordStruct(CartesianFlow,
+    coords = CoordStruct("Cartesian",
                          data)
     times = [100, 200, 300]
     comps = ['u', 'v', 'w']
@@ -31,7 +31,7 @@ def reference_coords():
     data = {'x': np.linspace(0, 100, 200),
             'y': np.linspace(0, 2, 50),
             'z': np.linspace(0, 6, 100)}
-    return CoordStruct(CartesianFlow,
+    return CoordStruct("Cartesian",
                        data)
 
 
@@ -138,7 +138,7 @@ def test_properties(reference_fstruct):
     assert np.array_equal(reference_fstruct.times,
                           np.array([100., 200., 300.]))
     assert reference_fstruct.dtype == np.float64
-    assert reference_fstruct.flow_type is CartesianFlow
+    assert reference_fstruct.flow_type is get_flow_type("Cartesian")
 
     reference_fstruct.times = [200., 300., 400.]
     assert np.array_equal(reference_fstruct.times,
@@ -460,3 +460,7 @@ def test_second_derivative(reference_fstruct):
 
     data = reference_fstruct.second_derivative('u', 'x', time=100)
     assert data.shape == (200, 50, 100)
+
+
+def test_to_vtk(reference_fstruct):
+    reference_fstruct.to_vtk(time=100)
