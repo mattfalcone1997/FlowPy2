@@ -58,7 +58,8 @@ def main():
 
     cython_dir = here / "src" / "flowpy" / "cython"
     cython_files = create_cython_ext(cython_dir,
-                                     extra_compile_args=["-fopenmp", "-O3"],
+                                     extra_compile_args=[
+                                         "-fopenmp", "-O3", "-fopt-info-vec-missed"],
                                      extra_link_args=["-fopenmp", "-O3"])
 
     from Cython.Build import cythonize

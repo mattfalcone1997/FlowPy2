@@ -11,9 +11,10 @@
         "numba": [],
         "numpy":[],
         "sympy":[],
+        "scipy":[],
         "h5py":[],
-        "matplotlib":[]
-    },
-    "pythons": ["3.9", "3.11"]
-
+        "matplotlib":[],
+        "cython":[],
+        "pyvista":[]
+    }
 }

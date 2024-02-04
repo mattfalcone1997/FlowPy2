@@ -1,8 +1,6 @@
-# cython: boundscheck False
-# cython: wraparound False
-# cython: cdivision True
+# cython: language=3, boundscheck=False, wraparound=False
 
-cimport numpy as np
+cimport numpy as cnp
 import numpy as np
 
 from cython.parallel import parallel,prange
@@ -12,11 +10,11 @@ ctypedef fused float_type:
     double
     float
 
-def gradient1_order2_dx(float_type[:,:] array, float_type dx):
+def gradient1_order2_dx(float_type[:,::1] array, float_type dx):
     gradient = np.zeros_like(array)
     
     cdef float_type idx = 1./dx
-    cdef float_type[:,:] grad_view = gradient
+    cdef float_type[:,::1] grad_view = gradient
     cdef int i, j, n, m
 
     m = grad_view.shape[0]
@@ -34,10 +32,10 @@ def gradient1_order2_dx(float_type[:,:] array, float_type dx):
 
     return gradient
 
-def gradient1_order2_var_x(float_type[:,:] array,float_type[:] x):
+def gradient1_order2_var_x(float_type[:,::1] array,float_type[::1] x):
     gradient = np.zeros_like(array)
 
-    cdef float_type[:,:] grad_view = gradient
+    cdef float_type[:,::1] grad_view = gradient
     cdef float_type dx1, dx2
     cdef float_type a, b, c
     cdef int i, j, n, m
@@ -76,13 +74,13 @@ def gradient1_order2_var_x(float_type[:,:] array,float_type[:] x):
     return gradient
 
 
-def gradient2_order2_dx(float_type[:,:] array, float_type dx):
+def gradient2_order2_dx(float_type[:,::1] array, float_type dx):
     
     gradient = np.zeros_like(array)
     
     cdef float_type idx2 = 1./(dx*dx)
     cdef float_type a, b, c
-    cdef float_type[:,:] grad_view = gradient
+    cdef float_type[:,::1] grad_view = gradient
     cdef int i, j, n, m
 
     m = grad_view.shape[0]
@@ -98,15 +96,15 @@ def gradient2_order2_dx(float_type[:,:] array, float_type dx):
         for j in prange(1, n-1):
             grad_view[i, j] = a*array[i, j-1] + b*array[i, j] + c*array[i, j+1]
 
-        grad_view[i, -1] = a*array[i, n-3] + b*array[i, n-2] + c*array[i, n-1]
+        grad_view[i, n-1] = a*array[i, n-3] + b*array[i, n-2] + c*array[i, n-1]
 
     return gradient
 
-def gradient2_order2_var_x(float_type[:,:] array, float_type[:] x):
+def gradient2_order2_var_x(float_type[:,::1] array, float_type[::1] x):
     
     gradient = np.zeros_like(array)
 
-    cdef float_type[:,:] grad_view = gradient
+    cdef float_type[:,::1] grad_view = gradient
     cdef float_type dx1, dx2
     cdef float_type a, b, c
     cdef int i, j, n, m
