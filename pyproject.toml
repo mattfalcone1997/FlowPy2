@@ -1,2 +1,15 @@
 [build-system]
 requires = ["setuptools", "cython", "numpy", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = 'flowpy'
+version = "0.0.1"
+requires-python = ">=3.7,<3.12"
+dynamic = ["dependencies"]
+readme = "README.md"
+authors = [{name = "Matthew Falcone", email="mapfalcone@gmail.com"}]
+description = "Package to process structured 3D CFD simulation data"
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
