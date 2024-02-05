@@ -6,7 +6,7 @@ from typing import Iterable, Callable, Union, Mapping, List
 from numbers import Number
 from .indexers import CompIndexer, TimeIndexer
 from matplotlib.axes import Axes
-from .arrays import ArrayExtensionsBase, array_backends, ArrayBackends
+from .arrays import CommonArrayExtensions, array_backends, ArrayBackends
 from .flow_type import FlowType
 
 import warnings
@@ -18,7 +18,7 @@ from .io import hdf5, netcdf
 logger = logging.getLogger(__name__)
 
 
-class FlowStructND(ArrayExtensionsBase):
+class FlowStructND(CommonArrayExtensions):
     _array_attr = '_array'
 
     def __init__(self,
@@ -31,7 +31,8 @@ class FlowStructND(ArrayExtensionsBase):
                  array_backend='numpy',
                  dtype: Union[str, type, None] = None,
                  attrs: Mapping = None,
-                 copy=False) -> None:
+                 copy=False,
+                 **kwargs) -> None:
 
         self._coords = self._set_coords(coorddata, data_layout)
         self._data_layout = tuple(data_layout)
@@ -50,6 +51,8 @@ class FlowStructND(ArrayExtensionsBase):
         self.attrs = dict(attrs)
         self._array = self._set_array(array, array_backend, dtype, copy)
         self._array_backend = array_backend
+
+        self._process_extra_args(**kwargs)
 
     def _set_coords(self, coorddata: CoordStruct, data_layout: Iterable[str]):
         if not isinstance(coorddata, CoordStruct):
@@ -204,17 +207,16 @@ class FlowStructND(ArrayExtensionsBase):
     def values(self):
         return self._array
 
-    def _validate_inputs(self, inputs):
-        super()._validate_inputs(inputs)
-        for x in inputs:
+    def _preprocess_array_ufunc(self, ufunc, method, *inputs, **kwargs):
+        actual_inputs = super()._preprocess_array_ufunc(ufunc, method, *inputs, **kwargs)
+        for x in actual_inputs:
             if isinstance(x, self.__class__):
                 if isinstance(x, self.__class__):
                     self._check_fstruct_compat(x, True, True)
 
-    def __array_ufunc__(self,  ufunc, method, *inputs, **kwargs):
+        return actual_inputs
 
-        data = super().__array_ufunc__(ufunc, method, *inputs, **kwargs)
-
+    def _postprocess_array_ufunc(self,  data):
         return self._construct_fstruct(self.coords, data, self.times, self.comps, self._data_layout)
 
     def __getitem__(self, key):
@@ -227,23 +229,16 @@ class FlowStructND(ArrayExtensionsBase):
             raise KeyError("Invalid key")
 
     def _construct_fstruct(self, coords, array, times, comps, data_layout):
-        args, kwds = self._get_internal_args_kwargs()
+        kwargs = self._get_internal_args(coorddata=coords,
+                                         array=array,
+                                         times=times,
+                                         comps=comps,
+                                         data_layout=data_layout)
 
-        fstruct = self.__class__(coords, array, comps, data_layout,
-                                 times, *args, **kwds)
+        return self.__class__(**kwargs)
 
-        return self._fstruct_promote(fstruct)
-
-    def _get_internal_args_kwargs(self, **kwargs):
-        kwds = dict(time_decimals=self._times.decimals,
-                    array_backend=self._array_backend,
-                    copy=False)
-        kwds.update(kwargs)
-
-        return (), kwds
-
-    def _fstruct_promote(self, fstruct):
-        return fstruct
+    def _get_internal_args(self, **kwargs):
+        return kwargs
 
     def _process_time_index(self, time):
         if time is None:

@@ -94,6 +94,51 @@ def test_list(test_dstruct: CoordStruct):
         test_dstruct.coord_index('x', data)
 
 
+def test_getitem(test_dstruct: CoordStruct):
+    array = list(test_dstruct._data)
+    index = list(test_dstruct._index)
+    a = test_dstruct['x']
+    flow_type = test_dstruct.flow_type.name
+    assert np.array_equal(a, array[0]), "check integer index"
+
+    sub_ds = CoordStruct(flow_type, array[:2], index=index[:2])
+    sub_ds2 = CoordStruct(flow_type, array[1:], index=index[1:])
+    sub_ds3 = CoordStruct(flow_type, [array[0]], index=[index[0]])
+
+    assert np.array_equal(
+        sub_ds, test_dstruct['x':'y']), "check slice index with start and stop"
+    assert np.array_equal(
+        sub_ds, test_dstruct[:'y']), "check slice index with stop"
+    assert np.array_equal(
+        sub_ds2, test_dstruct['y':]), "check slice index with start"
+    assert np.array_equal(
+        sub_ds3, test_dstruct['x':'x']), "check slice index with start"
+
+    with pytest.raises(ValueError):
+        test_dstruct['x':'y': 1]
+
+    with pytest.raises(KeyError):
+        test_dstruct['a']
+    with pytest.raises(KeyError):
+        test_dstruct['x':'a']
+    with pytest.raises(KeyError):
+        test_dstruct['a':'x']
+
+    assert np.array_equal(
+        sub_ds, test_dstruct[['x', 'y']]), "check slice index"
+    assert np.array_equal(
+        sub_ds3, test_dstruct[['x']]), "check slice index with start"
+
+    with pytest.raises(KeyError):
+        test_dstruct[['a']]
+
+    with pytest.raises(KeyError):
+        test_dstruct[['x', 'a']]
+
+    with pytest.raises(KeyError):
+        test_dstruct[('x', 'a')]
+
+
 def test_slice(test_dstruct):
     slicer1 = slice(None, None)
     ind = test_dstruct.coord_index('x', slicer1)

@@ -18,9 +18,9 @@ logger = logging.getLogger(__name__)
 class CoordStruct(DataStruct):
     def __init__(self, flow_type: str, *args, **kwargs):
 
-        self._flow_type = get_flow_type(flow_type)
-
         super().__init__(*args, **kwargs)
+
+        self._flow_type = get_flow_type(flow_type)
         self._flow_type.validate_keys(self.index)
         self._validate_coords()
 
@@ -29,6 +29,12 @@ class CoordStruct(DataStruct):
             diff = np.diff(d)
             if any(diff < 0):
                 raise ValueError("Coordinates must be in ascending order")
+
+    def _get_internal_args(self, array, index):
+        kwargs = {'data': array,
+                  'index': index,
+                  'flow_type': self._flow_type.name}
+        return kwargs
 
     def to_hdf(self, fn_or_obj, mode: str = None, key=None):
 

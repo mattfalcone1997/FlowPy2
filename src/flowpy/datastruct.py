@@ -5,7 +5,7 @@ import logging
 
 from typing import Iterable, Union
 from numpy.lib.mixins import NDArrayOperatorsMixin
-from .arrays import ArrayExtensionsBase, array_backends
+from .arrays import CommonArrayExtensions, array_backends
 from .indexers import CompIndexer
 from abc import ABC, abstractmethod
 
@@ -16,28 +16,34 @@ from .utils import find_stack_level
 logger = logging.getLogger(__name__)
 
 
-class DataStruct(ArrayExtensionsBase):
+class DataStruct(CommonArrayExtensions):
     _array_attr = '_data'
 
-    def __init__(self, *args, **kwargs):
-
-        data = self._process_args(*args, **kwargs)
+    def __init__(self,
+                 data: Union[Iterable[np.ndarray], dict[str, np.ndarray]],
+                 index: Iterable[str] = None,
+                 dtype: Union[str, np.dtype] = None,
+                 array_backend='numpy',
+                 copy=False,
+                 **kwargs):
 
         if isinstance(data, (list, np.ndarray)):
-            self._array_ini(*args, **kwargs)
+            if index is None:
+                TypeError("If data is an array or list, index must be given")
+
+            self._array_ini(data, index, dtype, array_backend, copy)
+
         elif isinstance(data, dict):
-            self._dict_ini(*args, **kwargs)
+            if index is not None:
+                TypeError("If data is a dict, index must not be given")
+
+            self._dict_ini(data, dtype, array_backend, copy)
+
         else:
             raise TypeError("No valid initialisation found for "
                             f"type {type(data).__name__}")
 
-    def _process_args(self, *args, **kwargs):
-        if args:
-            return args[0]
-        elif 'array' in kwargs:
-            return kwargs.get('array')
-        elif 'dict_array' in kwargs:
-            return kwargs.get('dict_array')
+        self._process_extra_args(**kwargs)
 
     @classmethod
     def from_hdf(cls, fn_or_obj, key=None, tag_check=None):
@@ -139,10 +145,11 @@ class DataStruct(ArrayExtensionsBase):
         index = self._index.get(key)
         if isinstance(index, int):
             return self._data[index]
+
         elif isinstance(index, (slice, list)):
             data = self._data[index]
             new_index = self._index[index]
-            return self._construct_args_kwargs(data, new_index)
+            return self._construct_dstruct(data, new_index)
 
         else:
             raise NotImplementedError("Loop fall through")
@@ -160,10 +167,8 @@ class DataStruct(ArrayExtensionsBase):
     def __delitem__(self, key):
         self.remove(key)
 
-    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
-
-        array = super().__array_ufunc__(ufunc, method, *inputs, **kwargs)
-        return self._construct_args_kwargs(array, self.index)
+    def _postprocess_array_ufunc(self, data):
+        return self._construct_dstruct(data, self.index)
 
     def _validate_inputs(self, inputs):
         super()._validate_inputs(inputs)
@@ -196,8 +201,17 @@ class DataStruct(ArrayExtensionsBase):
     def __contains__(self, key):
         return key in self._index
 
-    def _construct_args_kwargs(self, array, index, *args, **kwargs):
-        return self.__class__(array, index)
+    def _construct_dstruct(self, array, index):
+        kwargs = self._get_internal_args(array, index)
+
+        return self.__class__(**kwargs)
+
+    def _get_internal_args(self, array, index):
+        kwargs = {'data': array,
+                  'index': index,
+                  'array_backend': self._array_backend}
+
+        return kwargs
 
     def concat(self, datastruct):
         if type(datastruct) != self.__class__:
