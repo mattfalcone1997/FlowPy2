@@ -1,11 +1,11 @@
 import numpy as np
-from flowpy.indexers import (CompIndexer,
-                             TimeIndexer,
-                             IndexInitialisationError,
-                             RoundTruncationWarning,
-                             DtypeTruncationWarning)
+from flowpy2.indexers import (CompIndexer,
+                              TimeIndexer,
+                              IndexInitialisationError,
+                              RoundTruncationWarning,
+                              DtypeTruncationWarning)
 import pytest
-from flowpy.io import hdf5, netcdf
+from flowpy2.io import hdf5, netcdf
 from test_hdf5 import test_filename
 
 

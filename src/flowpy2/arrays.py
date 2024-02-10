@@ -2,7 +2,7 @@ import numpy as np
 import numbers
 import logging
 
-import flowpy as fp
+import flowpy2 as fp
 from abc import ABC, abstractmethod
 from numpy.lib.mixins import NDArrayOperatorsMixin
 from typing import Iterable, Type, Callable

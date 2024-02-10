@@ -1,7 +1,7 @@
 import numpy as np
 from .common import (BenchMark,
                      get_params)
-import flowpy.cython.gradient as cgr
+import flowpy2.cython.gradient as cgr
 import os
 
 

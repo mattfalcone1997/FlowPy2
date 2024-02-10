@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-import flowpy.numba.operations as op
+import flowpy2.numba.operations as op
 import logging
 
 _log = logging.getLogger(__name__)

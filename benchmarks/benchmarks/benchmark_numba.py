@@ -1,8 +1,8 @@
 import numpy as np
 from .common import (BenchMark,
                      get_params)
-import flowpy.gradient as gr
-import flowpy.numba.gradient as nbgr
+import flowpy2.gradient as gr
+import flowpy2.numba.gradient as nbgr
 import numba
 
 

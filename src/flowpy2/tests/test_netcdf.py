@@ -1,4 +1,4 @@
-from flowpy.io import netcdf
+from flowpy2.io import netcdf
 import netCDF4
 import pytest
 from tempfile import NamedTemporaryFile

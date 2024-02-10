@@ -4,12 +4,12 @@ import matplotlib.pyplot as plt
 
 from matplotlib.testing.decorators import check_figures_equal
 
-from flowpy.coords import (CoordStruct,
-                           logger)
-from flowpy.flow_type import register_flow_type
+from flowpy2.coords import (CoordStruct,
+                            logger)
+from flowpy2.flow_type import register_flow_type
 
 import pytest
-from flowpy.io import netcdf
+from flowpy2.io import netcdf
 from test_hdf5 import test_filename
 
 

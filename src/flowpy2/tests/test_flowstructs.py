@@ -1,6 +1,6 @@
-from flowpy.flowstruct import FlowStructND
-from flowpy.coords import CoordStruct
-from flowpy.flow_type import get_flow_type
+from flowpy2.flowstruct import FlowStructND
+from flowpy2.coords import CoordStruct
+from flowpy2.flow_type import get_flow_type
 from matplotlib.testing.decorators import check_figures_equal
 
 import pytest

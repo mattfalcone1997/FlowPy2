@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from flowpy import gradient
+from flowpy2 import gradient
 
 
 def test_register_gradient():

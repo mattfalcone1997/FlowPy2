@@ -1,6 +1,6 @@
 import inspect
 import os
-import flowpy as fp
+import flowpy2 as fp
 # function taken from pandas
 
 

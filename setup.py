@@ -42,7 +42,7 @@ def create_cython_ext(folder: str, **other_args) -> list[Extension]:
 
 def main():
 
-    cython_dir = join("src", "flowpy", "cython")
+    cython_dir = join("src", "flowpy2", "cython")
     cython_files = create_cython_ext(cython_dir,
                                      extra_compile_args=[
                                          "-fopenmp", "-O3", "-fopt-info-vec-missed"],

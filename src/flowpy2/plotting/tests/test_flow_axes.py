@@ -6,7 +6,7 @@ import numpy as np
 from matplotlib.testing.decorators import check_figures_equal
 
 
-from flowpy.plotting import update_prop_cycle
+from flowpy2.plotting import update_prop_cycle
 
 
 @check_figures_equal()

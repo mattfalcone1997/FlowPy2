@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-import flowpy.cython.gradient as gr
+import flowpy2.cython.gradient as gr
 
 
 def test_gradient_order2_dx():

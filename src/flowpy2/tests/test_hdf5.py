@@ -1,4 +1,4 @@
-from flowpy.io import hdf5
+from flowpy2.io import hdf5
 import h5py
 import pytest
 from tempfile import NamedTemporaryFile

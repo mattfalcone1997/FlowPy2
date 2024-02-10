@@ -1,9 +1,9 @@
 import numpy as np
 import logging
-from flowpy.datastruct import (DataStruct,
-                               logger)
-# from flowpy.arrays_old import GroupArray
-from flowpy.indexers import CompIndexer
+from flowpy2.datastruct import (DataStruct,
+                                logger)
+# from flowpy2.arrays_old import GroupArray
+from flowpy2.indexers import CompIndexer
 from test_hdf5 import test_filename
 import pytest
 
