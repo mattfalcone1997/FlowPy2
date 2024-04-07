@@ -3,9 +3,16 @@ from numba import njit, prange
 from .operations import tdma_solve
 from ._utils import log_jit
 
+_gradient_dx_signature = ['f8[:,:](f8[:,:], f8)',
+                          'f4[:,:](f4[:,:], f4)']
 
-@njit(parallel=True, error_model='numpy', cache=True)
-def gradient1_order2_dx(array: np.ndarray[np.floating], dx: float):
+_gradient_varx_signature = ['f8[:,:](f8[:,:], f8[:])',
+                            'f4[:,:](f4[:,:], f4[:])']
+
+
+@njit(_gradient_dx_signature, parallel=True,
+      error_model='numpy', cache=True)
+def gradient1_order2_dx(array: np.ndarray, dx: float):
     gradient = np.zeros_like(array)
     idx = 1./dx
     for i in prange(array.shape[0]):
@@ -22,8 +29,8 @@ def gradient1_order2_dx(array: np.ndarray[np.floating], dx: float):
     return gradient
 
 
-@njit(parallel=True, error_model='numpy', cache=True)
-def gradient1_order2_var_x(array: np.ndarray[np.floating], x: float):
+@njit(_gradient_varx_signature, parallel=True, error_model='numpy', cache=True)
+def gradient1_order2_var_x(array: np.ndarray, x: float):
     gradient = np.zeros_like(array)
 
     for i in prange(array.shape[0]):
@@ -56,8 +63,8 @@ def gradient1_order2_var_x(array: np.ndarray[np.floating], x: float):
     return gradient
 
 
-@njit(parallel=True, error_model='numpy', cache=True)
-def gradient2_order2_dx(array: np.ndarray[np.floating], dx: float):
+@njit(_gradient_dx_signature, parallel=True, error_model='numpy', cache=True)
+def gradient2_order2_dx(array: np.ndarray, dx: float):
     gradient = np.zeros_like(array)
     idx2 = 1./(dx*dx)
     a = idx2
@@ -74,8 +81,9 @@ def gradient2_order2_dx(array: np.ndarray[np.floating], dx: float):
     return gradient
 
 
-@njit(parallel=True, error_model='numpy', cache=True)
-def gradient2_order2_var_x(array: np.ndarray[np.floating], x: float):
+@njit(_gradient_varx_signature, parallel=True,
+      error_model='numpy', cache=True)
+def gradient2_order2_var_x(array: np.ndarray, x: float):
     gradient = np.zeros_like(array)
     for i in prange(array.shape[0]):
         dx1 = x[1] - x[0]
@@ -107,8 +115,9 @@ def gradient2_order2_var_x(array: np.ndarray[np.floating], x: float):
     return gradient
 
 
-@njit(parallel=True, error_model='numpy', cache=True)
-def _rhs_gradient1_order6_dx(array: np.ndarray[np.floating], dx: float):
+@njit(_gradient_dx_signature, parallel=True,
+      error_model='numpy', cache=True)
+def _rhs_gradient1_order6_dx(array: np.ndarray, dx: float):
     idx = 1./dx
     a = 7.*idx/9.
     b = 1.*idx/36.
@@ -130,7 +139,7 @@ def _rhs_gradient1_order6_dx(array: np.ndarray[np.floating], dx: float):
     return rhs
 
 
-def gradient1_order6_dx(array: np.ndarray[np.floating], dx: float):
+def gradient1_order6_dx(array: np.ndarray, dx: float):
 
     ldiag = np.zeros(array.shape[-1])
     cdiag = np.ones(array.shape[-1])
@@ -151,8 +160,9 @@ def gradient1_order6_dx(array: np.ndarray[np.floating], dx: float):
     return tdma_solve(ldiag, cdiag, rdiag, rhs)
 
 
-@njit(parallel=True, error_model='numpy', cache=True)
-def _rhs_gradient2_order6_dx(array: np.ndarray[np.floating], dx: float):
+@njit(_gradient_dx_signature, parallel=True,
+      error_model='numpy', cache=True)
+def _rhs_gradient2_order6_dx(array: np.ndarray, dx: float):
     idx2 = 1./(dx*dx)
     a = 12.*idx2/11.
     b = 3.*idx2/44
@@ -175,7 +185,7 @@ def _rhs_gradient2_order6_dx(array: np.ndarray[np.floating], dx: float):
     return rhs
 
 
-def gradient2_order6_dx(array: np.ndarray[np.floating], dx: float):
+def gradient2_order6_dx(array: np.ndarray, dx: float):
     ldiag = np.zeros(array.shape[-1])
     cdiag = np.ones(array.shape[-1])
     rdiag = np.zeros(array.shape[-1])
@@ -195,134 +205,135 @@ def gradient2_order6_dx(array: np.ndarray[np.floating], dx: float):
     return tdma_solve(ldiag, cdiag, rdiag, rhs)
 
 
-@njit(parallel=True, error_model='numpy', cache=True)
-def _rhs_gradient1_order6_var_x(array: np.ndarray[np.floating], dx_array: np.ndarray[np.floating]):
+# @njit(_gradient_varx_signature, parallel=True,
+#       error_model='numpy', cache=True)
+# def _rhs_gradient1_order6_var_x(array: np.ndarray, dx_array: np.ndarray):
 
-    rhs = np.zeros_like(array)
-    # point 0
-    a = None
-    b = None
-    c = None
-    rhs[:, 0] = a*array[:, 0] + b*array[:, 1] + c*array[:, 2]
+#     rhs = np.zeros_like(array)
+#     # point 0
+#     a = None
+#     b = None
+#     c = None
+#     rhs[:, 0] = a*array[:, 0] + b*array[:, 1] + c*array[:, 2]
 
-    a = None
-    b = None
-    c = None
-    rhs[:, 1] = a*array[:, 0] + b*array[:, 1] + c*array[:, 2]
+#     a = None
+#     b = None
+#     c = None
+#     rhs[:, 1] = a*array[:, 0] + b*array[:, 1] + c*array[:, 2]
 
-    # point n
+#     # point n
 
-    a = None
-    b = None
-    c = None
-    rhs[:, -1] = a*array[:, -1] + b*array[:, -2] + c*array[:, -3]
+#     a = None
+#     b = None
+#     c = None
+#     rhs[:, -1] = a*array[:, -1] + b*array[:, -2] + c*array[:, -3]
 
-    # point n-1
-    a = None
-    b = None
-    c = None
+#     # point n-1
+#     a = None
+#     b = None
+#     c = None
 
-    rhs[:, -2] = a*array[:, -3] + b*array[:, -2] + array[:, -1]
+#     rhs[:, -2] = a*array[:, -3] + b*array[:, -2] + array[:, -1]
 
-    # middle
-    a = np.array(array.shape[-1]-2)
-    b = np.array(array.shape[-1]-2)
-    c = np.array(array.shape[-1]-2)
-    d = np.array(array.shape[-1]-2)
-    e = np.array(array.shape[-1]-2)
+#     # middle
+#     a = np.array(array.shape[-1]-2)
+#     b = np.array(array.shape[-1]-2)
+#     c = np.array(array.shape[-1]-2)
+#     d = np.array(array.shape[-1]-2)
+#     e = np.array(array.shape[-1]-2)
 
-    rhs[:, 2:-2] = a*array[:, :-4] + b*array[:, 1:-3] + c*array[:, 2:-2] \
-        + d*array[:, 3:-1] + e*array[:, 4:]
+#     rhs[:, 2:-2] = a*array[:, :-4] + b*array[:, 1:-3] + c*array[:, 2:-2] \
+#         + d*array[:, 3:-1] + e*array[:, 4:]
 
-    return rhs
-
-
-def gradient1_order6_var_x(array: np.ndarray[np.floating], x: np.ndarray[np.floating]):
-    ldiag = np.zeros(array.shape[-1])
-    cdiag = np.ones(array.shape[-1])
-    rdiag = np.zeros(array.shape[-1])
-
-    dx_array = np.zeros(array.shape[-1]-1)
-
-    # update
-    ldiag[1] = 0.25
-    ldiag[2:-2] = 1/3
-    ldiag[-2] = 0.25
-    ldiag[-1] = 2
-
-    rdiag[0] = 2
-    rdiag[1] = 0.25
-    rdiag[2:-2] = 1/3
-    rdiag[-2] = 0.25
-
-    rhs = _rhs_gradient1_order6_var_x(array, dx_array)
-
-    return tdma_solve(ldiag, cdiag, rdiag, rhs)
+#     return rhs
 
 
-@njit(parallel=True, error_model='numpy', cache=True)
-def _rhs_gradient2_order6_var_x(array: np.ndarray[np.floating], dx_array: np.ndarray[np.floating]):
+# def gradient1_order6_var_x(array: np.ndarray, x: np.ndarray):
+#     ldiag = np.zeros(array.shape[-1])
+#     cdiag = np.ones(array.shape[-1])
+#     rdiag = np.zeros(array.shape[-1])
 
-    rhs = np.zeros_like(array)
-    # point 0
-    a = None
-    b = None
-    c = None
-    rhs[:, 0] = a*array[:, 0] + b*array[:, 1] + c*array[:, 2]
+#     dx_array = np.zeros(array.shape[-1]-1)
 
-    a = None
-    b = None
-    c = None
-    rhs[:, 1] = a*array[:, 0] + b*array[:, 1] + c*array[:, 2]
+#     # update
+#     ldiag[1] = 0.25
+#     ldiag[2:-2] = 1/3
+#     ldiag[-2] = 0.25
+#     ldiag[-1] = 2
 
-    # point n
+#     rdiag[0] = 2
+#     rdiag[1] = 0.25
+#     rdiag[2:-2] = 1/3
+#     rdiag[-2] = 0.25
 
-    a = None
-    b = None
-    c = None
-    rhs[:, -1] = a*array[:, -1] + b*array[:, -2] + c*array[:, -3]
+#     rhs = _rhs_gradient1_order6_var_x(array, dx_array)
 
-    # point n-1
-    a = None
-    b = None
-    c = None
-
-    rhs[:, -2] = a*array[:, -3] + b*array[:, -2] + array[:, -1]
-
-    # middle
-    a = np.array(array.shape[-1]-2)
-    b = np.array(array.shape[-1]-2)
-    c = np.array(array.shape[-1]-2)
-    d = np.array(array.shape[-1]-2)
-    e = np.array(array.shape[-1]-2)
-
-    rhs[:, 2:-2] = a*array[:, :-4] + b*array[:, 1:-3] + c*array[:, 2:-2] \
-        + d*array[:, 3:-1] + e*array[:, 4:]
-
-    return rhs
+#     return tdma_solve(ldiag, cdiag, rdiag, rhs)
 
 
-def gradient2_order6_var_x(array: np.ndarray[np.floating], x: np.ndarray[np.floating]):
-    ldiag = np.zeros(array.shape[-1])
-    cdiag = np.ones(array.shape[-1])
-    rdiag = np.zeros(array.shape[-1])
+# @njit(_gradient_varx_signature, parallel=True, error_model='numpy', cache=True)
+# def _rhs_gradient2_order6_var_x(array: np.ndarray, dx_array: np.ndarray):
 
-    dx_array = np.zeros(array.shape[-1]-1)
+#     rhs = np.zeros_like(array)
+#     # point 0
+#     a = None
+#     b = None
+#     c = None
+#     rhs[:, 0] = a*array[:, 0] + b*array[:, 1] + c*array[:, 2]
 
-    # update
-    ldiag[1] = 0.25
-    ldiag[2:-2] = 1/3
-    ldiag[-2] = 0.25
-    ldiag[-1] = 2
+#     a = None
+#     b = None
+#     c = None
+#     rhs[:, 1] = a*array[:, 0] + b*array[:, 1] + c*array[:, 2]
 
-    rdiag[0] = 2
-    rdiag[1] = 0.25
-    rdiag[2:-2] = 1/3
-    rdiag[-2] = 0.25
+#     # point n
 
-    rhs = _rhs_gradient2_order6_var_x(array, dx_array)
+#     a = None
+#     b = None
+#     c = None
+#     rhs[:, -1] = a*array[:, -1] + b*array[:, -2] + c*array[:, -3]
 
-    return tdma_solve(ldiag, cdiag, rdiag, rhs)
+#     # point n-1
+#     a = None
+#     b = None
+#     c = None
+
+#     rhs[:, -2] = a*array[:, -3] + b*array[:, -2] + array[:, -1]
+
+#     # middle
+#     a = np.array(array.shape[-1]-2)
+#     b = np.array(array.shape[-1]-2)
+#     c = np.array(array.shape[-1]-2)
+#     d = np.array(array.shape[-1]-2)
+#     e = np.array(array.shape[-1]-2)
+
+#     rhs[:, 2:-2] = a*array[:, :-4] + b*array[:, 1:-3] + c*array[:, 2:-2] \
+#         + d*array[:, 3:-1] + e*array[:, 4:]
+
+#     return rhs
+
+
+# def gradient2_order6_var_x(array: np.ndarray, x: np.ndarray):
+#     ldiag = np.zeros(array.shape[-1])
+#     cdiag = np.ones(array.shape[-1])
+#     rdiag = np.zeros(array.shape[-1])
+
+#     dx_array = np.zeros(array.shape[-1]-1)
+
+#     # update
+#     ldiag[1] = 0.25
+#     ldiag[2:-2] = 1/3
+#     ldiag[-2] = 0.25
+#     ldiag[-1] = 2
+
+#     rdiag[0] = 2
+#     rdiag[1] = 0.25
+#     rdiag[2:-2] = 1/3
+#     rdiag[-2] = 0.25
+
+#     rhs = _rhs_gradient2_order6_var_x(array, dx_array)
+
+#     return tdma_solve(ldiag, cdiag, rdiag, rhs)
 
 
 log_jit(gradient1_order2_dx)
@@ -331,5 +342,5 @@ log_jit(gradient2_order2_dx)
 log_jit(gradient2_order2_var_x)
 log_jit(_rhs_gradient1_order6_dx)
 log_jit(_rhs_gradient2_order6_dx)
-log_jit(_rhs_gradient1_order6_var_x)
-log_jit(_rhs_gradient2_order6_var_x)
+# log_jit(_rhs_gradient1_order6_var_x)
+# log_jit(_rhs_gradient2_order6_var_x)

@@ -6,6 +6,7 @@ from typing import Callable, Union
 from numbers import Number
 from .numba import gradient
 
+from matplotlib.rcsetup import validate_string
 from math import ceil, floor
 logger = logging.getLogger(__name__)
 
@@ -15,6 +16,8 @@ _second_derivatives = dict()
 
 _default_method = [None]
 
+_rc_params = {'default_method': 'numba2'}
+_rc_validators = {'default_method': validate_string}
 
 def set_default_gradient(name: str):
     if name not in _first_derivatives:

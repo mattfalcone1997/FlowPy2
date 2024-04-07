@@ -1,7 +1,8 @@
+from __future__ import annotations
 from .io import hdf5
 import numpy as np
 import logging
-from abc import ABC, abstractproperty
+import copy
 from typing import Tuple, Callable, Mapping
 from matplotlib.projections import get_projection_class
 from .plotting import subplots
@@ -18,7 +19,9 @@ logger = logging.getLogger(__name__)
 # laplacians, divergences etc
 
 class FlowType:
-    def __init__(self, name: str, keys: Tuple[str],
+    def __init__(self,
+                 name: str,
+                 keys: Tuple[str],
                  projection: str = None,
                  symbols: dict = None,
                  transform_cartesian: Callable = None):
@@ -77,12 +80,21 @@ class FlowType:
         return self._symbols
 
     @property
-    def name(self):
+    def name(self)->str:
         return self._name
 
-    @abstractproperty
+    @property
+    def is_time_type(self)->bool:
+        return 't' in self._base_keys
+
+    def get_time_type(self)->FlowType:
+        if self.is_time_type:
+            return self
+        else:
+            return get_flow_type(self._name+' (time)')
+            
     def Transform(self):
-        pass
+        return self._transform_cartesian
 
     def set_mpl_projection(self, projection):
         get_projection_class(projection)
@@ -190,6 +202,12 @@ class FlowType:
 
         return subplots(*args, **kwargs)
 
+    def __deepcopy__(self,memo):
+        return self.__class__(self._name,
+                              self._base_keys,
+                              self._projection,
+                              self._symbols,
+                              self._transform_cartesian)
 
 _flow_types = {}
 
@@ -199,6 +217,14 @@ def register_flow_type(flow_type: FlowType):
         raise KeyError(f"Name {flow_type.name} is already a flow_type")
 
     _flow_types[flow_type.name] = flow_type
+
+    # add type for time as dimension
+
+    flow_type_time = copy.deepcopy(flow_type)
+    flow_type_time._base_keys += ('t',)
+    flow_type_time._name += " (time)"
+
+    _flow_types[flow_type_time.name] = flow_type_time
 
 
 def get_flow_type(name) -> FlowType:
@@ -212,7 +238,6 @@ def get_flow_type(name) -> FlowType:
 register_flow_type(FlowType("Cartesian",
                             ('x', 'y', 'z'),
                             projection='FlowAxes'))
-
 
 def _polar_to_cartesian(polar_data: Mapping):
     x = polar_data['z']

@@ -3,7 +3,7 @@ import numbers
 import copy
 import logging
 
-from typing import Iterable, Union
+from typing import Iterable, Union, Dict
 from numpy.lib.mixins import NDArrayOperatorsMixin
 from .arrays import CommonArrayExtensions, array_backends
 from .indexers import CompIndexer
@@ -20,7 +20,7 @@ class DataStruct(CommonArrayExtensions):
     _array_attr = '_data'
 
     def __init__(self,
-                 data: Union[Iterable[np.ndarray], dict[str, np.ndarray]],
+                 data: Union[Iterable[np.ndarray], Dict[str, np.ndarray]],
                  index: Iterable[str] = None,
                  dtype: Union[str, np.dtype] = None,
                  array_backend='numpy',
@@ -78,13 +78,18 @@ class DataStruct(CommonArrayExtensions):
 
         array_backend = g.attrs['array_backend']
 
-        return DataStruct(data, index=index, array_backend=array_backend)
+        kwargs = cls._hdf5_read_hook(g)
+        
+        return cls._create_struct(data=data,
+                                  index=index,
+                                  array_backend=array_backend,
+                                  **kwargs)
 
     def to_hdf(self, fn_or_obj, mode=None, key=None):
         g = hdf5.make_group(fn_or_obj, mode, key)
         hdf5.set_type_tag(type(self), g)
 
-        index_array = self._index.to_hdf(g, "index")
+        self._index.to_hdf(g, "index")
 
         d = g.create_group("data")
         data = np.concatenate([d.flatten() for d in self._data], axis=0)
@@ -96,6 +101,8 @@ class DataStruct(CommonArrayExtensions):
 
         g.attrs['array_backend'] = self._array_backend
 
+        self._hdf5_write_hook(g)
+        
         if isinstance(fn_or_obj, hdf5.H5_Group_File):
             return g
         else:
@@ -121,7 +128,10 @@ class DataStruct(CommonArrayExtensions):
         self._array_backend = array_backend
 
         array = [creator(arr, dtype=dtype, copy=copy) for arr in array]
-        self._data = np.array(array, dtype=object)
+
+        self._data = np.empty(len(array),dtype=object)
+        for i in range(self._data.size):
+            self._data[i] = array[i]
 
     def _dict_ini(self,
                   dict_array: dict,
@@ -149,7 +159,9 @@ class DataStruct(CommonArrayExtensions):
         elif isinstance(index, (slice, list)):
             data = self._data[index]
             new_index = self._index[index]
-            return self._construct_dstruct(data, new_index)
+            kwargs = self._init_args_from_kwargs(data=data,
+                                                 index=new_index)
+            return self._create_struct(**kwargs)
 
         else:
             raise NotImplementedError("Loop fall through")
@@ -168,7 +180,8 @@ class DataStruct(CommonArrayExtensions):
         self.remove(key)
 
     def _postprocess_array_ufunc(self, data):
-        return self._construct_dstruct(data, self.index)
+        kwargs = self._init_args_from_kwargs(data=data)
+        return self._create_struct(**kwargs)
 
     def _validate_inputs(self, inputs):
         super()._validate_inputs(inputs)
@@ -201,24 +214,23 @@ class DataStruct(CommonArrayExtensions):
     def __contains__(self, key):
         return key in self._index
 
-    def _construct_dstruct(self, array, index):
-        kwargs = self._get_internal_args(array, index)
+    def _init_args_from_kwargs(self,**kwargs):
+        self._init_update_kwargs(kwargs, 'data', self._data)
 
-        return self.__class__(**kwargs)
+        self._init_update_kwargs(kwargs, 'index', self._index)
 
-    def _get_internal_args(self, array, index):
-        kwargs = {'data': array,
-                  'index': index,
-                  'array_backend': self._array_backend}
+        self._init_update_kwargs(kwargs, 'dtype', self._data[0].dtype.type)
 
-        return kwargs
-
+        self._init_update_kwargs(kwargs, 'array_backend', self._array_backend)
+    
+        return kwargs 
+    
     def concat(self, datastruct):
         if type(datastruct) != self.__class__:
             raise TypeError(f"Merging {self.__class__.__name}"
                             " must be of the same type")
         self._index.extend(datastruct._index)
-        self._data = np.concatenate([self._data, datastruct._data], axis=0)
+        self._data = np.concatenate([self._data, datastruct._data], axis=0,dtype=object)
 
     def remove(self, keys):
         indexer = self._index.get_other(keys)

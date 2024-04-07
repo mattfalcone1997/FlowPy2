@@ -5,4 +5,5 @@ from .mpl_extensions import (figure,
                              subplots,
                              show,
                              close,
-                             set_default_projection)
+                             set_default_projection,
+                             FlowAxes)

@@ -10,7 +10,9 @@ from scipy import io
 from numbers import Number
 
 from ..utils import find_stack_level
-
+from ._common import (valid_tag_checks,
+                      make_tag,
+                      weak_tag_check)
 logger = logging.getLogger(__name__)
 
 H5_Group_File = (h5py.File, h5py.Group)
@@ -24,29 +26,24 @@ class HDF5TagWarning(UserWarning):
     pass
 
 
-def _make_tag(cls) -> str:
-    return '.'.join([cls.__module__,
-                     cls.__name__])
 
-
-def set_type_tag(cls, g: Union[h5py.File, h5py.Group]):
-    ref_tag = _make_tag(cls)
+def set_type_tag(cls: type, g: Union[h5py.File, h5py.Group]):
+    ref_tag = make_tag(cls)
     g.attrs['type_tag'] = ref_tag
 
 
-_valid_tag_checks = ("strict", 'warn', 'nocheck')
 
 
-def validate_tag(cls, g: Union[h5py.File, h5py.Group], tag_check):
+def validate_tag(cls: type, g: Union[h5py.File, h5py.Group], tag_check):
 
     if not isinstance(g, H5_Group_File):
         raise TypeError("Invalid type")
 
-    if tag_check not in _valid_tag_checks:
+    if tag_check not in valid_tag_checks:
         raise ValueError(f"Invalid tag check type: {tag_check}. "
-                         f"Must be in {' '.join(_valid_tag_checks)}")
+                         f"Must be in {' '.join(valid_tag_checks)}")
 
-    ref_tag = _make_tag(cls)
+    ref_tag = make_tag(cls)
     try:
         tag = g.attrs['type_tag']
     except KeyError:
@@ -68,6 +65,11 @@ def validate_tag(cls, g: Union[h5py.File, h5py.Group], tag_check):
             warnings.warn(msg,
                           category=HDF5TagWarning,
                           stacklevel=find_stack_level())
+
+        elif tag_check == 'weak':
+            weak_tag_check(cls,
+                            tag,
+                            HDF5TagError)
 
         elif tag_check == 'nocheck':
             logger.debug("Tags do not match. You can change "

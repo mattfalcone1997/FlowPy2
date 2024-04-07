@@ -3,6 +3,9 @@ import logging
 import warnings
 from ..utils import find_stack_level
 import inspect
+from ._common import (valid_tag_checks,
+                      make_tag,
+                      weak_tag_check)
 try:
     import netCDF4
 except ImportError:
@@ -21,17 +24,12 @@ class netCDF4TagWarning(UserWarning):
     pass
 
 
-def _make_tag(cls) -> str:
-    return '.'.join([inspect.getmodule(cls).__name__,
-                     cls.__name__])
-
 
 def set_type_tag(cls, g, tag_attr='type_tag'):
-    ref_tag = _make_tag(cls)
+    ref_tag = make_tag(cls)
     setattr(g, tag_attr, ref_tag)
 
 
-_valid_tag_checks = ("strict", 'warn', 'nocheck')
 
 
 def validate_tag(cls, g, tag_check, tag_attr='type_tag'):
@@ -39,11 +37,11 @@ def validate_tag(cls, g, tag_check, tag_attr='type_tag'):
     if not isinstance(g, (netCDF4.Dataset, netCDF4.Group)):
         raise TypeError("Invalid type")
 
-    if tag_check not in _valid_tag_checks:
+    if tag_check not in valid_tag_checks:
         raise ValueError(f"Invalid tag check type: {tag_check}. "
-                         f"Must be in {' '.join(_valid_tag_checks)}")
+                         f"Must be in {' '.join(valid_tag_checks)}")
 
-    ref_tag = _make_tag(cls)
+    ref_tag = make_tag(cls)
     try:
         tag = getattr(g, tag_attr)
     except AttributeError:
@@ -65,7 +63,11 @@ def validate_tag(cls, g, tag_check, tag_attr='type_tag'):
             warnings.warn(msg,
                           category=netCDF4TagWarning,
                           stacklevel=find_stack_level())
-
+        elif tag_check == 'weak':
+            weak_tag_check(cls,
+                            tag,
+                            netCDF4TagError)
+            
         elif tag_check == 'nocheck':
             logger.debug("Tags do not match. You can change "
                          "tag check through keyword or rcParams")

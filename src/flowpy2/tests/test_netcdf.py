@@ -81,6 +81,11 @@ def test_validate_tag(test_filename):
 
     netcdf.validate_tag(type(a), g1, 'nocheck')
 
+    class ndarray_subclass(np.ndarray):
+        pass
+
+    netcdf.validate_tag(ndarray_subclass, g, 'weak')
+
     with pytest.raises(netcdf.netCDF4TagError):
         netcdf.validate_tag(type(a), g1, 'strict')
 
@@ -99,6 +104,15 @@ def test_validate_tag(test_filename):
     with pytest.warns(netcdf.netCDF4TagWarning):
         netcdf.validate_tag(netCDF4.Dataset, g, 'warn')
 
+
+    g2 = netcdf.make_dataset(g, key="group2")
+    setattr(g2, 'type_tag', "numpy.nddarray") 
+    with pytest.raises(netcdf.netCDF4TagError):
+        netcdf.validate_tag(np.ndarray, g2, 'weak')
+
+    setattr(g2, 'type_tag', "numpyy.ndarray") 
+    with pytest.raises(netcdf.netCDF4TagError):
+        netcdf.validate_tag(np.ndarray, g2, 'weak')
 
 def test_access_group(test_filename):
 

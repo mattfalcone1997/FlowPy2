@@ -202,6 +202,16 @@ def test_get_comps_times(reference_fstruct):
     assert np.array_equal(f.times, np.array([100, 200]))
     assert np.array_equal(f._array, reference_fstruct._array[:2, [0]])
 
+    # tests get when times is None: error used to occur here
+    f1 = FlowStructND(reference_fstruct.coords,
+                      reference_fstruct._array[0],
+                      reference_fstruct.comps,
+                      reference_fstruct._data_layout,
+                      times=None)
+    
+    
+    f1.get(comp=['u', 'w'])
+
     with pytest.raises(KeyError):
         reference_fstruct.get(comp='z')
 
@@ -259,6 +269,32 @@ def test_get_coords(reference_fstruct):
     with pytest.raises(ValueError):
         f = reference_fstruct.get(x=slice(-0.5, None))
 
+def test_slice(reference_fstruct):
+    f = reference_fstruct.slice[0:50]
+    assert all(f.coords['x'] < 50+0.5*np.diff(f.coords['x'])[0])
+    f = reference_fstruct.slice[:,0:1]
+    assert all(f.coords['y'] < 1+0.5*np.diff(f.coords['y'])[0])
+
+    f = reference_fstruct.slice[0:50,0:1]
+    assert all(f.coords['x'] < 50+0.5*np.diff(f.coords['x'])[0])
+    assert all(f.coords['y'] < 1+0.5*np.diff(f.coords['y'])[0])
+
+    f = reference_fstruct.slice[50]
+    assert 'x' not in f.coords.index
+    assert np.array_equal(f._array, reference_fstruct._array[:, :, 100])
+
+    f = reference_fstruct.slice[50,1]
+    assert 'x' not in f.coords.index
+    assert 'y' not in f.coords.index
+    assert np.array_equal(f._array, reference_fstruct._array[:, :, 100, 24])
+
+    f = reference_fstruct.slice[50, 0:1]
+    assert 'x' not in f.coords.index
+
+    with pytest.raises(ValueError):
+        f = reference_fstruct.slice[:101]
+    with pytest.raises(ValueError):
+        f = reference_fstruct.slice[-0.5:]
 
 def test_reduce(reference_fstruct):
     sum_op = reference_fstruct.reduce(np.sum, axis='z')
@@ -289,6 +325,16 @@ def test_getitem(reference_fstruct):
     f2 = reference_fstruct[100, 'u']
 
     assert np.array_equal(f1, f2)
+
+
+def test_setitem(reference_fstruct):
+    array = np.random.randn(*reference_fstruct.shape)
+    reference_fstruct[100, 'u'] = array
+
+    assert np.array_equal(reference_fstruct[100, 'u'], array)
+
+    with pytest.raises(ValueError):
+        reference_fstruct[100, 'u'] = array[:, :, :-1]
 
 
 def test_concat_comps(reference_fstruct):
@@ -388,14 +434,52 @@ def test_to_netcdf(reference_fstruct, test_filename):
 
     assert reference_fstruct == fstruct2
 
+def test_plot_exceptions(reference_fstruct):
+
+    struct1d = reference_fstruct.get(x=50,z=3)
+    struct2d = reference_fstruct.get(y=1)
+
+    with pytest.raises(ValueError):
+        struct1d.plot_line('u','y')
+
+    with pytest.raises(ValueError):
+        struct2d.pcolormesh('u','xz')
+
+    with pytest.warns(UserWarning):
+        struct1d.plot_line('u','x',time=100)
+
+    with pytest.warns(UserWarning):
+        struct1d.plot_line('u',loc=2,time=100)
+
+    with pytest.warns(UserWarning):
+        struct2d.pcolormesh('u','xz',1,time=100)
+
+    with pytest.raises(ValueError):
+        struct1d.pcolormesh('u','xz',time=100)
+
 
 @check_figures_equal()
 def test_plot_line(fig_test, fig_ref, reference_fstruct):
     ax = fig_test.subplots()
-    reference_fstruct.plot_line('y', {'x': 50, 'z': 3},
-                                'u',
+    reference_fstruct.plot_line('u','y', {'x': 50, 'z': 3},
                                 time=100,
                                 ax=ax)
+
+    # y = reference_fstruct._array[0, 0, 100, :, 50]
+    y = reference_fstruct.get(x=50, z=3, time=100, comp='u')
+    x = reference_fstruct.coords['y']
+
+    ax1 = fig_ref.subplots()
+    ax1.plot(x, y)
+
+@check_figures_equal()
+def test_plot_line1D(fig_test, fig_ref, reference_fstruct):
+    ax = fig_test.subplots()
+    struct1d = reference_fstruct.get(x=50,z=3)
+
+    struct1d.plot_line('u',
+                        time=100,
+                        ax=ax)
 
     # y = reference_fstruct._array[0, 0, 100, :, 50]
     y = reference_fstruct.get(x=50, z=3, time=100, comp='u')
@@ -408,40 +492,82 @@ def test_plot_line(fig_test, fig_ref, reference_fstruct):
 @check_figures_equal()
 def test_pcolormesh(fig_test, fig_ref, reference_fstruct):
     ax = fig_test.subplots()
-    reference_fstruct.pcolormesh('xz', 1, 'u', time=100, ax=ax)
+    reference_fstruct.pcolormesh('u','xz', 1, time=100, ax=ax)
 
     ax1 = fig_ref.subplots()
     y = reference_fstruct.coords['z']
     x = reference_fstruct.coords['x']
     z = reference_fstruct.get(y=1, comp='u', time=100)
 
-    ax1.pcolormesh(y, x, z)
+    ax1.pcolormesh(x, y, z.T)
+
+@check_figures_equal()
+def test_pcolormesh2D(fig_test, fig_ref, reference_fstruct):
+    ax = fig_test.subplots()
+
+    struct2d = reference_fstruct.get(y=1)
+    struct2d.pcolormesh('u','xz', time=100, ax=ax)
+
+    ax1 = fig_ref.subplots()
+    y = reference_fstruct.coords['z']
+    x = reference_fstruct.coords['x']
+    z = reference_fstruct.get(y=1, comp='u', time=100)
+
+    ax1.pcolormesh(x, y, z.T)
 
 
 @check_figures_equal()
 def test_contour(fig_test, fig_ref, reference_fstruct):
     ax = fig_test.subplots()
-    reference_fstruct.contour('xz', 1, 'u', time=100, ax=ax)
+    reference_fstruct.contour('u', 'xz', 1, time=100, ax=ax)
 
     ax1 = fig_ref.subplots()
     y = reference_fstruct.coords['z']
     x = reference_fstruct.coords['x']
     z = reference_fstruct.get(y=1, comp='u', time=100)
 
-    ax1.contour(y, x, z)
+    ax1.contour(x, y, z.T)
+
+@check_figures_equal()
+def test_contour2D(fig_test, fig_ref, reference_fstruct):
+    ax = fig_test.subplots()
+    
+    struct2d = reference_fstruct.get(y=1)
+    struct2d.contour('u','xz', time=100, ax=ax)
+
+    ax1 = fig_ref.subplots()
+    y = reference_fstruct.coords['z']
+    x = reference_fstruct.coords['x']
+    z = reference_fstruct.get(y=1, comp='u', time=100)
+
+    ax1.contour(x, y, z.T)
 
 
 @check_figures_equal()
 def test_contourf(fig_test, fig_ref, reference_fstruct):
     ax = fig_test.subplots()
-    reference_fstruct.contourf('xz', 1, 'u', time=100, ax=ax)
+    reference_fstruct.contourf('u', 'xz', 1, time=100, ax=ax)
 
     ax1 = fig_ref.subplots()
     y = reference_fstruct.coords['z']
     x = reference_fstruct.coords['x']
     z = reference_fstruct.get(y=1, comp='u', time=100)
 
-    ax1.contourf(y, x, z)
+    ax1.contourf(x, y, z.T)
+
+@check_figures_equal()
+def test_contourf2D(fig_test, fig_ref, reference_fstruct):
+    ax = fig_test.subplots()
+    
+    struct2d = reference_fstruct.get(y=1)
+    struct2d.contourf('u','xz', time=100, ax=ax)
+
+    ax1 = fig_ref.subplots()
+    y = reference_fstruct.coords['z']
+    x = reference_fstruct.coords['x']
+    z = reference_fstruct.get(y=1, comp='u', time=100)
+
+    ax1.contourf(x, y, z.T)
 
 
 def test_first_derivative(reference_fstruct):
@@ -464,3 +590,28 @@ def test_second_derivative(reference_fstruct):
 
 def test_to_vtk(reference_fstruct):
     reference_fstruct.to_vtk(time=100)
+
+
+def test_window_uniform(reference_fstruct):
+
+    window_ref = reference_fstruct.window('uniform',101)
+
+    ref_array = reference_fstruct._array[:2].mean(axis=0)
+    assert np.array_equal(ref_array,window_ref._array[0])
+
+    ref_array = reference_fstruct._array.mean(axis=0)
+    assert np.array_equal(ref_array,window_ref._array[1])
+
+    ref_array = reference_fstruct._array[1:].mean(axis=0)
+    assert np.array_equal(ref_array,window_ref._array[2])
+
+    with pytest.warns(UserWarning):
+        reference_fstruct.window('uniform',50)
+
+def test_times_to_ND(reference_fstruct):
+    timestruct = reference_fstruct.time_to_ND()
+
+    assert timestruct.times is None
+    assert np.array_equal(timestruct.coords['t'], reference_fstruct.times)
+    for i in range(len(reference_fstruct.times)):
+        assert np.allclose(reference_fstruct._array[i],timestruct._array[...,i],atol=0,rtol=1e-10)

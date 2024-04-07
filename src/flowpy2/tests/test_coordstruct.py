@@ -196,6 +196,11 @@ def test_subplots(test_dstruct: CoordStruct):
     assert hasattr(ax, 'normalise')
 
 
+def test_translate(test_dstruct: CoordStruct):
+    test_dstruct.Translate(x=100)
+    assert np.array_equal(test_dstruct['x'], np.arange(100, 200, dtype='f8'),)
+
+
 @check_figures_equal()
 def test_line_plots(fig_test, fig_ref, test_dstruct):
 
@@ -217,7 +222,7 @@ def test_pcolormesh(fig_test, fig_ref, test_dstruct):
     data = np.random.randn(100, 50)
 
     ax1 = fig_ref.subplots()
-    ax1.pcolormesh(coords2, coords1, data)
+    ax1.pcolormesh(coords1, coords2, data.T)
 
     ax2 = fig_test.subplots()
     test_dstruct.pcolormesh('xy', data, ax=ax2)
@@ -232,7 +237,7 @@ def test_contourf(fig_test, fig_ref, test_dstruct):
     data = np.random.randn(100, 50)
 
     ax1 = fig_ref.subplots()
-    ax1.contourf(coords2, coords1, data)
+    ax1.contourf(coords1, coords2, data.T)
 
     ax2 = fig_test.subplots()
     test_dstruct.contourf('xy', data, ax=ax2)
@@ -247,7 +252,7 @@ def test_contour(fig_test, fig_ref, test_dstruct):
     data = np.random.randn(100, 50)
 
     ax1 = fig_ref.subplots()
-    ax1.contour(coords2, coords1, data)
+    ax1.contour(coords1, coords2, data.T)
 
     ax2 = fig_test.subplots()
     test_dstruct.contour('xy', data, ax=ax2)

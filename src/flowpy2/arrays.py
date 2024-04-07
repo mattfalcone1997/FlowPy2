@@ -3,11 +3,12 @@ import numbers
 import logging
 
 import flowpy2 as fp
-from abc import ABC, abstractmethod
+from .io import hdf5
+from abc import ABC, abstractmethod, abstractclassmethod
 from numpy.lib.mixins import NDArrayOperatorsMixin
 from typing import Iterable, Type, Callable
-from contextlib import contextmanager
-from collections.abc import MutableMapping
+
+from matplotlib.rcsetup import validate_string
 logger = logging.getLogger(__name__)
 
 try:
@@ -19,6 +20,8 @@ except ImportError:
     HAVE_CUPY = False
     logger.debug("cupy unavailble")
 
+_rc_params = {'backend': 'numpy'}
+_rc_validators = {'backend': validate_string}
 
 class ArrayBackends:
     def __init__(self):
@@ -169,5 +172,31 @@ class CommonArrayExtensions(NDArrayOperatorsMixin, ABC):
     def _process_extra_args(self, **kwargs):
         pass
 
-    def _get_internal_args(self, **kwargs):
+    # def _get_internal_args(self, **kwargs):
+    #     pass
+
+    @staticmethod
+    def _hdf5_read_hook(h5_group: hdf5.H5_Group_File):
+        return {}
+
+    def _hdf5_write_hook(self, h5_group: hdf5.H5_Group_File):
+        pass
+
+    @staticmethod
+    def _netcdf_read_hook(netcdf_dataset):
+        return {}
+
+    def _netcdf_write_hook(self, netcdf_dataset):
+        pass
+
+    @classmethod
+    def _create_struct(cls,**kwargs):
+        return cls(**kwargs)
+
+    def _init_update_kwargs(self,kwargs: dict, key: str, value):
+        if key not in kwargs:
+            kwargs[key] = value
+
+    @abstractmethod
+    def _init_args_from_kwargs(self,*args,**kwargs):
         pass

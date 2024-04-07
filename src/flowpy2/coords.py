@@ -6,7 +6,8 @@ from typing import Sequence, Union, Callable, Mapping
 from numbers import Number
 
 from .datastruct import DataStruct
-from .flow_type import get_flow_type
+from .flow_type import (get_flow_type,
+                        FlowType)
 from .gradient import (first_derivative,
                        second_derivative)
 from .indexers import CompIndexer
@@ -30,60 +31,28 @@ class CoordStruct(DataStruct):
             if any(diff < 0):
                 raise ValueError("Coordinates must be in ascending order")
 
-    def _get_internal_args(self, array, index):
-        kwargs = {'data': array,
-                  'index': index,
-                  'flow_type': self._flow_type.name}
+    def _init_args_from_kwargs(self, **kwargs):
+        kwargs = super()._init_args_from_kwargs(**kwargs)
+        self._init_update_kwargs(kwargs,
+                                 'flow_type',
+                                 self._flow_type.name)
         return kwargs
 
-    def to_hdf(self, fn_or_obj, mode: str = None, key=None):
-
-        g = hdf5.make_group(fn_or_obj, mode, key=key)
-
-        g = super().to_hdf(g)
-
+    def _hdf5_write_hook(self, g: hdf5.H5_Group_File):
         g.attrs['flow_type'] = self._flow_type.name
-
-        if isinstance(fn_or_obj, hdf5.H5_Group_File):
-            return g
-        else:
-            g.file.close()
-
+    
     @classmethod
-    def from_hdf(cls, fn_or_obj, key=None, tag_check=None):
-        g = hdf5.access_group(fn_or_obj, key)
-        if tag_check is None:
-            tag_check = 'strict'
+    def _hdf5_read_hook(cls,h5_group: hdf5.H5_Group_File):
+        return {'flow_type' : h5_group.attrs['flow_type']}
 
-        hdf5.validate_tag(cls, g, tag_check)
+    def Translate(self, **kwargs):
+        for k in kwargs:
+            if k not in self.index:
+                raise ValueError(f"{k} not in {self.__class__.__name__}")
+            if not isinstance(kwargs[k], Number):
+                raise TypeError("Invalid type")
 
-        index = CompIndexer.from_hdf(g, "index")
-        d = g['data']
-        data_array = d['data'][:]
-        shapes = d['shapes']
-        ndims = d['ndim'][:]
-
-        start = 0
-        stop = 0
-
-        arr_stop = 0
-        arr_start = 0
-
-        data = []
-
-        for ndim in ndims:
-            stop += ndim
-            shape = shapes[start:stop]
-            arr_stop += np.prod(shape)
-            item = data_array[arr_start:arr_stop].reshape(shape)
-            data.append(item)
-            start += ndim
-            arr_start += np.prod(shape)
-
-        array_backend = g.attrs['array_backend']
-
-        flow_type = g.attrs['flow_type']
-        return CoordStruct(flow_type, data, index=index, array_backend=array_backend)
+            self[k] += kwargs[k]
 
     def to_netcdf(self, group):
         if not netcdf.HAVE_NETCDF4:
@@ -126,6 +95,17 @@ class CoordStruct(DataStruct):
     def flow_type(self):
         return self._flow_type
 
+    @flow_type.setter
+    def flow_type(self,value: Union[str,FlowType]):
+        if isinstance(value, str):
+            value = get_flow_type(value)
+        
+        old_base_keys = self._flow_type._base_keys
+        if not all(val in value._base_keys for val in old_base_keys):
+            raise ValueError("FlowType old base_keys must all "
+                             "be in the new base keys")
+        self._flow_type = value
+
     def rescale(self, key: str, val: Number):
         self._data[key] /= val
 
@@ -134,6 +114,9 @@ class CoordStruct(DataStruct):
                   fig_kw=None, **kwargs):
 
         if ax is None:
+            if fig_kw is None:
+                fig_kw = {}
+
             fig, ax = self._flow_type.subplots(**fig_kw)
 
         coords = self.get(comp)
@@ -176,12 +159,14 @@ class CoordStruct(DataStruct):
                 fig_kw=None, **kwargs):
 
         if ax is None:
+            if fig_kw is None:
+                fig_kw = {}
             fig, ax = self._flow_type.subplots(**fig_kw)
 
         xcoords, ycoords = self._get_coords_contour(plane, transform_xdata,
                                                     transform_ydata)
 
-        return ax.contour(ycoords, xcoords, data, **kwargs)
+        return ax.contour(xcoords, ycoords, data.T, **kwargs)
 
     def contourf(self, plane: Sequence[str], data: np.ndarray, ax=None,
                  transform_xdata=None,
@@ -189,12 +174,14 @@ class CoordStruct(DataStruct):
                  fig_kw=None, **kwargs):
 
         if ax is None:
+            if fig_kw is None:
+                fig_kw = {}
             fig, ax = self._flow_type.subplots(**fig_kw)
 
         xcoords, ycoords = self._get_coords_contour(plane, transform_xdata,
                                                     transform_ydata)
 
-        return ax.contourf(ycoords, xcoords, data, **kwargs)
+        return ax.contourf(xcoords, ycoords, data.T, **kwargs)
 
     def pcolormesh(self, plane: Sequence[str], data: np.ndarray, ax=None,
                    transform_xdata=None,
@@ -202,12 +189,14 @@ class CoordStruct(DataStruct):
                    fig_kw: Mapping = None, **kwargs):
 
         if ax is None:
+            if fig_kw is None:
+                fig_kw = {}
             fig, ax = self._flow_type.subplots(**fig_kw)
 
         xcoords, ycoords = self._get_coords_contour(plane, transform_xdata,
                                                     transform_ydata)
 
-        return ax.pcolormesh(ycoords, xcoords, data, **kwargs)
+        return ax.pcolormesh(xcoords, ycoords, data.T, **kwargs)
 
     def coord_index(self, comp: str, loc: Union[Number, list, slice]):
         if isinstance(loc, Number):

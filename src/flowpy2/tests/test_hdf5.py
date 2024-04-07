@@ -69,8 +69,17 @@ def test_validate_tag(test_filename):
     hdf5.validate_tag(type(a), g, 'strict')
     hdf5.validate_tag(type(a), g1, 'nocheck')
 
+    class ndarray_subclass(np.ndarray):
+        pass
+
+    hdf5.validate_tag(ndarray_subclass, g, 'weak')
+
+
     with pytest.raises(hdf5.HDF5TagError):
         hdf5.validate_tag(type(a), g1, 'strict')
+
+    with pytest.raises(hdf5.HDF5TagError):
+        hdf5.validate_tag(ndarray_subclass, g, 'strict')
 
     with pytest.raises(hdf5.HDF5TagError):
         hdf5.validate_tag(h5py.File, g1, 'strict')
@@ -87,6 +96,18 @@ def test_validate_tag(test_filename):
     with pytest.warns(hdf5.HDF5TagWarning):
         hdf5.validate_tag(h5py.File, g, 'warn')
 
+    with pytest.raises(hdf5.HDF5TagError):
+        hdf5.validate_tag(h5py.File, g, 'weak')
+
+    g2 = hdf5.make_group(g, key="group2")
+    g2.attrs['type_tag'] = "numpy.nddarray"
+    with pytest.raises(hdf5.HDF5TagError):
+        hdf5.validate_tag(np.ndarray, g2, 'weak')
+
+    g2.attrs['type_tag'] = "numpyy.ndarray"
+    with pytest.raises(hdf5.HDF5TagError):
+        hdf5.validate_tag(np.ndarray, g2, 'weak')
+        
 
 def test_access_group(test_filename):
 
