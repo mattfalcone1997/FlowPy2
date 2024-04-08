@@ -3,7 +3,7 @@ from .io import hdf5
 import numpy as np
 import logging
 import copy
-from typing import Tuple, Callable, Mapping
+from typing import Tuple, Callable, Mapping, Union
 from matplotlib.projections import get_projection_class
 from .plotting import subplots
 
@@ -18,13 +18,16 @@ logger = logging.getLogger(__name__)
 # Quantities for computing gradients ->
 # laplacians, divergences etc
 
+
 class FlowType:
     def __init__(self,
                  name: str,
                  keys: Tuple[str],
                  projection: str = None,
                  symbols: dict = None,
-                 transform_cartesian: Callable = None):
+                 transform_cartesian: Callable = None,
+                 plot_line_processor: Callable=None,
+                 contour_processor: Callable=None):
 
         self._projection = projection
         if not all(isinstance(key, str) for key in keys):
@@ -42,6 +45,9 @@ class FlowType:
 
         self._transform_cartesian = self._validate_transform(
             transform_cartesian)
+
+        self._plot_line_process = self._validate_line_data(plot_line_processor)
+        self._contour_process = self._validate_line_data(contour_processor)
 
     def _validate_transform(self, transform_cartesian: Callable):
 
@@ -68,6 +74,33 @@ class FlowType:
             raise ValueError("Keys in ouput not in base keys")
 
         return transform_cartesian
+
+    def _validate_line_data(self,func: Union[Callable,None]):
+        if func is None: return None
+
+        try:
+            func('y',np.arange(50),np.arange(50),{})
+        except Exception as e:
+            raise Exception("Line plot processor validator "
+                            f"failed with exception:\n\n {e}") from None
+        
+        return func
+    
+    def _validate_contour_data(self,func: Union[Callable,None]):
+        if func is None: return None
+
+        try:
+            x = np.arange(50)
+            y = np.arange(100)
+            c = np.arange(5000).reshape(50,100)
+            func('y',x ,y , c,{})
+
+        except Exception as e:
+            raise Exception("Contour processor validator "
+                            f"failed with exception:\n\n {e}") from None
+        
+        return func
+
 
     def transform(self, input_grid):
         if self._transform_cartesian is None:
@@ -110,53 +143,53 @@ class FlowType:
             raise ValueError("Invalid key for flow "
                              f"type {self.__class__.__name__}")
 
-    def to_hdf(self,  fn_or_obj, mode=None, key=None):
-        g = hdf5.make_group(fn_or_obj, mode, key)
-        hdf5.set_type_tag(type(self), g)
+    # def to_hdf(self,  fn_or_obj, mode=None, key=None):
+    #     g = hdf5.make_group(fn_or_obj, mode, key)
+    #     hdf5.set_type_tag(type(self), g)
 
-        g.attrs['name'] = self._name
-        if self._projection is not None:
-            g.attrs['projection'] = self._projection
+    #     g.attrs['name'] = self._name
+    #     if self._projection is not None:
+    #         g.attrs['projection'] = self._projection
 
-        for k, v in self._symbols.items():
-            g.attrs[k] = v
+    #     for k, v in self._symbols.items():
+    #         g.attrs[k] = v
 
-        g.create_dataset("base_keys", data=np.array(
-            self._base_keys, dtype=np.string_))
+    #     g.create_dataset("base_keys", data=np.array(
+    #         self._base_keys, dtype=np.string_))
 
-    def to_netcdf(self, g):
-        if self._projection is not None:
-            g.projection = np.string_(self._projection)
+    # def to_netcdf(self, g):
+    #     if self._projection is not None:
+    #         g.projection = np.string_(self._projection)
 
-        g.flowtype_name = np.string_(self._name)
-        g.base_keys = self._base_keys
+    #     g.flowtype_name = np.string_(self._name)
+    #     g.base_keys = self._base_keys
 
-        for k, v in self._symbols.items():
-            attr_name = "flowtype_attr_%s" % k
-            setattr(g, attr_name, v)
+    #     for k, v in self._symbols.items():
+    #         attr_name = "flowtype_attr_%s" % k
+    #         setattr(g, attr_name, v)
 
-    @classmethod
-    def from_netcdf(cls, g):
-        if hasattr(g, 'projection'):
-            projection = str(g.projection)
-        else:
-            projection = None
+    # @classmethod
+    # def from_netcdf(cls, g):
+    #     if hasattr(g, 'projection'):
+    #         projection = str(g.projection)
+    #     else:
+    #         projection = None
 
-        name = str(g.flowtype_name)
-        base_keys = tuple(g.base_keys)
+    #     name = str(g.flowtype_name)
+    #     base_keys = tuple(g.base_keys)
 
-        attrs = [key for key in g.__dict__.keys()
-                 if 'flowtype_attr_' in key]
-        symbols = {}
+    #     attrs = [key for key in g.__dict__.keys()
+    #              if 'flowtype_attr_' in key]
+    #     symbols = {}
 
-        for attr in attrs:
-            key = attr.split('flowtype_attr_')
-            symbols[key] = getattr(g, attr)
+    #     for attr in attrs:
+    #         key = attr.split('flowtype_attr_')
+    #         symbols[key] = getattr(g, attr)
 
-        return cls(name,
-                   tuple(base_keys),
-                   projection=projection,
-                   symbols=attrs)
+    #     return cls(name,
+    #                tuple(base_keys),
+    #                projection=projection,
+    #                symbols=attrs)
 
     def __eq__(self, value: object) -> bool:
         if type(self) != type(value):
@@ -180,19 +213,6 @@ class FlowType:
 
         return True
 
-    @classmethod
-    def from_hdf(cls,  fn_or_obj, key):
-        g = hdf5.access_group(fn_or_obj, key)
-        hdf5.validate_tag(cls, g, 'strict')
-
-        attrs = dict(g.attrs)
-        name = attrs.pop('name')
-        projection = attrs.pop('projection', None)
-
-        return cls(name,
-                   tuple(key.decode('utf-8') for key in g["base_keys"][:]),
-                   projection=projection,
-                   symbols=attrs)
 
     def subplots(self, *args, **kwargs):
         subplots_kw = kwargs.get('subplot_kw', {})
@@ -207,7 +227,33 @@ class FlowType:
                               self._base_keys,
                               self._projection,
                               self._symbols,
-                              self._transform_cartesian)
+                              self._transform_cartesian,
+                              self._plot_line_process,
+                              self._contour_process)
+
+    def process_data_line(self,
+                          line: str,
+                          x: np.ndarray,
+                          y: np.ndarray,
+                          kwargs):
+        
+        if self._plot_line_process is None:
+            return x, y
+        
+        return self._plot_line_process(line, x, y, kwargs)
+    
+    def process_data_contour(self,
+                             plane: str,
+                             x: np.ndarray,
+                             y: np.ndarray,
+                             c: np.ndarray,
+                             kwargs):
+        if self._contour_process is None:
+            return x, y, c
+        
+        return self._contour_process(plane, x, y, c, kwargs)
+
+    
 
 _flow_types = {}
 

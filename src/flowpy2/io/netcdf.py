@@ -57,14 +57,14 @@ def validate_tag(cls, g, tag_check, tag_attr='type_tag'):
                "tag check through keyword or rcParams")
 
         if tag_check == 'strict':
-            raise netCDF4TagError(msg)
+            raise netCDF4TagError("Strick check: "+msg)
 
         elif tag_check == 'warn':
             warnings.warn(msg,
                           category=netCDF4TagWarning,
                           stacklevel=find_stack_level())
         elif tag_check == 'weak':
-            weak_tag_check(cls,
+            cls = weak_tag_check(cls,
                             tag,
                             netCDF4TagError)
             
@@ -72,6 +72,7 @@ def validate_tag(cls, g, tag_check, tag_attr='type_tag'):
             logger.debug("Tags do not match. You can change "
                          "tag check through keyword or rcParams")
 
+    return cls
 
 def make_dataset(fn_or_obj, mode=None, key=None):
     if isinstance(fn_or_obj, (str, bytes)):

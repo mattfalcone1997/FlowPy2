@@ -1,5 +1,6 @@
 from .io import hdf5, netcdf
 import numpy as np
+import flowpy2 as fp2
 from .plotting import subplots
 import logging
 from typing import Sequence, Union, Callable, Mapping
@@ -75,14 +76,15 @@ class CoordStruct(DataStruct):
 
         g = netcdf.access_dataset(group, key)
         if tag_check is None:
-            tag_check = 'strict'
+            tag_check = fp2.rcParams['io.tag_check']
 
-        netcdf.validate_tag(cls, g, tag_check, "coords_tag")
+        real_cls = netcdf.validate_tag(cls, g, tag_check, "coords_tag")
 
         flow_type = get_flow_type(g.flow_type)
         data = {k: g[k][:] for k in flow_type._base_keys}
 
-        return cls(flow_type.name, data)
+        return real_cls._create_struct(flow_type=flow_type.name,
+                                       data=data)
 
     def _validate_inputs(self, inputs):
         super()._validate_inputs(inputs)
@@ -120,6 +122,11 @@ class CoordStruct(DataStruct):
             fig, ax = self._flow_type.subplots(**fig_kw)
 
         coords = self.get(comp)
+
+        coords, data = self.flow_type.process_data_line(comp,
+                                                  coords,
+                                                  data,
+                                                  kwargs)
 
         if transform_xdata is not None:
             if not callable(transform_xdata):
@@ -163,10 +170,17 @@ class CoordStruct(DataStruct):
                 fig_kw = {}
             fig, ax = self._flow_type.subplots(**fig_kw)
 
-        xcoords, ycoords = self._get_coords_contour(plane, transform_xdata,
+        xcoords, ycoords = self._get_coords_contour(plane,
+                                                    transform_xdata,
                                                     transform_ydata)
 
-        return ax.contour(xcoords, ycoords, data.T, **kwargs)
+        x, y, c = self.flow_type.process_data_contour(plane,
+                                                      xcoords,
+                                                      ycoords,
+                                                      data,
+                                                      kwargs)
+                                                      
+        return ax.contour(x, y, c.T, **kwargs)
 
     def contourf(self, plane: Sequence[str], data: np.ndarray, ax=None,
                  transform_xdata=None,
@@ -181,7 +195,12 @@ class CoordStruct(DataStruct):
         xcoords, ycoords = self._get_coords_contour(plane, transform_xdata,
                                                     transform_ydata)
 
-        return ax.contourf(xcoords, ycoords, data.T, **kwargs)
+        x, y, c = self.flow_type.process_data_contour(plane,
+                                                      xcoords,
+                                                      ycoords,
+                                                      data,
+                                                      kwargs)
+        return ax.contourf(x, y, c.T, **kwargs)
 
     def pcolormesh(self, plane: Sequence[str], data: np.ndarray, ax=None,
                    transform_xdata=None,
@@ -195,8 +214,13 @@ class CoordStruct(DataStruct):
 
         xcoords, ycoords = self._get_coords_contour(plane, transform_xdata,
                                                     transform_ydata)
-
-        return ax.pcolormesh(xcoords, ycoords, data.T, **kwargs)
+        
+        x, y, c = self.flow_type.process_data_contour(plane,
+                                                      xcoords,
+                                                      ycoords,
+                                                      data,
+                                                      kwargs)
+        return ax.pcolormesh(x, y, c.T, **kwargs)
 
     def coord_index(self, comp: str, loc: Union[Number, list, slice]):
         if isinstance(loc, Number):

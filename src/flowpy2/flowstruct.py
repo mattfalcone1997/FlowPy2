@@ -202,6 +202,8 @@ class FlowStructND(CommonArrayExtensions):
 
         if self._times is not None:
             indexer[0], shape[0], out_fst = self._process_time_index(time)
+        else:
+            out_fst = True
 
         indexer[1], shape[1], out_fsc = self._process_comp_index(comp)
 
@@ -455,7 +457,7 @@ class FlowStructND(CommonArrayExtensions):
     def Translate(self, **kwargs):
         self._coords.Translate(**kwargs)
 
-    def to_hdf(self, fn_or_obj: str, mode: str = None, key: str = None, compress=True):
+    def to_hdf(self, fn_or_obj: str, mode: str = None, key: str = None, compress=False):
 
         g = hdf5.make_group(fn_or_obj, mode, key)
 
@@ -499,9 +501,9 @@ class FlowStructND(CommonArrayExtensions):
         if tag_check is None:
             tag_check = fp2.rcParams['io.tag_check']
 
-        hdf5.validate_tag(cls, g, tag_check)
+        real_cls = hdf5.validate_tag(cls, g, tag_check)
 
-        coords = CoordStruct.from_hdf(g, 'coords')
+        coords = CoordStruct.from_hdf(g, 'coords', tag_check=tag_check)
         array = g['array'][:]
         comps = CompIndexer.from_hdf(g, 'comps')
         times = TimeIndexer.from_hdf(g, 'times')
@@ -515,7 +517,7 @@ class FlowStructND(CommonArrayExtensions):
         location_keys = [k.removeprefix('location_') for k in attrs if 'location_' in k]
         location = {k : attrs[f'location_{k}'] for k in location_keys}
         
-        kwargs = cls._hdf5_read_hook(g)
+        kwargs = real_cls._hdf5_read_hook(g)
 
         for k in location_keys:
             del attrs[f'location_{k}']
@@ -527,16 +529,16 @@ class FlowStructND(CommonArrayExtensions):
         if not isinstance(fn_or_obj, hdf5.H5_Group_File):
             g.file.close()
 
-        return cls._create_struct(coorddata=coords,
-                                  array=array,
-                                  comps=comps,
-                                  data_layout=data_layout,
-                                  times=times,
-                                  time_decimals=times.decimals,
-                                  array_backend=array_backend,
-                                  attrs=attrs,
-                                  location=location,
-                                  **kwargs)
+        return real_cls._create_struct(coorddata=coords,
+                                       array=array,
+                                       comps=comps,
+                                       data_layout=data_layout,
+                                       times=times,
+                                       time_decimals=times.decimals,
+                                       array_backend=array_backend,
+                                       attrs=attrs,
+                                       location=location,
+                                       **kwargs)
     
 
     def to_netcdf(self, fn_or_obj: str, mode: str = None, key: str = None, compress=True):
@@ -771,8 +773,8 @@ class FlowStructND(CommonArrayExtensions):
                    transform_xdata: Callable = None,
                    transform_cdata: Callable = None,
                    ax: Axes = None,
-                   contour_kw: Mapping = None,
-                   fig_kw: Mapping = None) -> Axes:
+                   fig_kw: Mapping = None,
+                   **contour_kw) -> Axes:
 
         data = self._base_contour(comp, plane, loc, time, transform_cdata)
 
@@ -794,8 +796,8 @@ class FlowStructND(CommonArrayExtensions):
                  transform_xdata: Callable = None,
                  transform_cdata: Callable = None,
                  ax: Axes = None,
-                 contour_kw: Mapping = None,
-                 fig_kw: Mapping = None) -> Axes:
+                 fig_kw: Mapping = None,
+                 **contour_kw) -> Axes:
 
         data = self._base_contour(comp, plane, loc, time, transform_cdata)
 
@@ -817,8 +819,8 @@ class FlowStructND(CommonArrayExtensions):
                 transform_xdata: Callable = None,
                 transform_cdata: Callable = None,
                 ax: Axes = None,
-                contour_kw: Mapping = None,
-                fig_kw: Mapping = None) -> Axes:
+                fig_kw: Mapping = None,
+                 **contour_kw) -> Axes:
 
         data = self._base_contour(comp, plane, loc, time, transform_cdata)
 
@@ -902,6 +904,10 @@ class FlowStructND(CommonArrayExtensions):
         return data
     
     def time_to_ND(self)->FlowStructND:
+        if self._times is None:
+            raise ValueError("This function can only be called "
+                             "if times are present")
+        
         if 't' in self._data_layout:
             return self
         

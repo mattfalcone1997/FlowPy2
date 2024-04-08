@@ -2,14 +2,14 @@ import numpy as np
 import numbers
 import copy
 import logging
-
+import flowpy2 as fp2
 from typing import Iterable, Union, Dict
 from numpy.lib.mixins import NDArrayOperatorsMixin
 from .arrays import CommonArrayExtensions, array_backends
 from .indexers import CompIndexer
 from abc import ABC, abstractmethod
 
-from .io import hdf5
+from .io import hdf5, cls_from_tag
 import warnings
 from .utils import find_stack_level
 
@@ -49,9 +49,9 @@ class DataStruct(CommonArrayExtensions):
     def from_hdf(cls, fn_or_obj, key=None, tag_check=None):
         g = hdf5.access_group(fn_or_obj, key)
         if tag_check is None:
-            tag_check = 'strict'
+            tag_check = fp2.rcParams['io.tag_check']
 
-        hdf5.validate_tag(cls, g, tag_check)
+        real_cls = hdf5.validate_tag(cls, g, tag_check)
 
         index = CompIndexer.from_hdf(g, "index")
         d = g['data']
@@ -78,12 +78,12 @@ class DataStruct(CommonArrayExtensions):
 
         array_backend = g.attrs['array_backend']
 
-        kwargs = cls._hdf5_read_hook(g)
+        kwargs = real_cls._hdf5_read_hook(g)
         
-        return cls._create_struct(data=data,
-                                  index=index,
-                                  array_backend=array_backend,
-                                  **kwargs)
+        return real_cls._create_struct(data=data,
+                                        index=index,
+                                        array_backend=array_backend,
+                                        **kwargs)
 
     def to_hdf(self, fn_or_obj, mode=None, key=None):
         g = hdf5.make_group(fn_or_obj, mode, key)

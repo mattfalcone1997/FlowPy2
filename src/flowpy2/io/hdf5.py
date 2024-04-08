@@ -55,11 +55,12 @@ def validate_tag(cls: type, g: Union[h5py.File, h5py.Group], tag_check):
             return
 
     if ref_tag != tag:
-        msg = ("Tags do not match. You can change "
-               "tag check through keyword or rcParams")
+        msg = (f"Tags do not match {ref_tag} vs {tag}. "
+               "You can change tag check through keyword "
+               "or rcParams")
 
         if tag_check == 'strict':
-            raise HDF5TagError(msg)
+            raise HDF5TagError("Strick check: "+msg)
 
         elif tag_check == 'warn':
             warnings.warn(msg,
@@ -67,13 +68,14 @@ def validate_tag(cls: type, g: Union[h5py.File, h5py.Group], tag_check):
                           stacklevel=find_stack_level())
 
         elif tag_check == 'weak':
-            weak_tag_check(cls,
-                            tag,
-                            HDF5TagError)
+            cls = weak_tag_check(cls,
+                                tag,
+                                HDF5TagError)
 
         elif tag_check == 'nocheck':
-            logger.debug("Tags do not match. You can change "
-                         "tag check through keyword or rcParams")
+            logger.debug(msg)
+
+    return cls
 
 
 def _get_name_file_group(g: Union[h5py.File, h5py.Group]):
