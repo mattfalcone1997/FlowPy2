@@ -11,7 +11,7 @@ ctypedef fused float_type:
     float
 
 def gradient1_order2_dx(float_type[:,::1] array, float_type dx):
-    gradient = np.zeros_like(array)
+    gradient = np.zeros((array.shape[0],array.shape[1]))
     
     cdef float_type idx = 1./dx
     cdef float_type[:,::1] grad_view = gradient
@@ -33,7 +33,7 @@ def gradient1_order2_dx(float_type[:,::1] array, float_type dx):
     return gradient
 
 def gradient1_order2_var_x(float_type[:,::1] array,float_type[::1] x):
-    gradient = np.zeros_like(array)
+    gradient = np.zeros((array.shape[0],array.shape[1]))
 
     cdef float_type[:,::1] grad_view = gradient
     cdef float_type dx1, dx2
@@ -53,7 +53,7 @@ def gradient1_order2_var_x(float_type[:,::1] array,float_type[::1] x):
 
         grad_view[i, 0] = a*array[i, 0] + b*array[i, 1] + c*array[i, 2]
 
-        for j in range(1, n-1):
+        for j in prange(1, n-1):
             dx1 = x[j] - x[j-1]
             dx2 = x[j+1] - x[j]
 
@@ -76,7 +76,7 @@ def gradient1_order2_var_x(float_type[:,::1] array,float_type[::1] x):
 
 def gradient2_order2_dx(float_type[:,::1] array, float_type dx):
     
-    gradient = np.zeros_like(array)
+    gradient = np.zeros((array.shape[0],array.shape[1]))
     
     cdef float_type idx2 = 1./(dx*dx)
     cdef float_type a, b, c
@@ -93,7 +93,7 @@ def gradient2_order2_dx(float_type[:,::1] array, float_type dx):
     for i in prange(m, nogil=True):
         grad_view[i, 0] = a*array[i, 0] + b*array[i, 1] + c*array[i, 2]
 
-        for j in range(1, n-1):
+        for j in prange(1, n-1):
             grad_view[i, j] = a*array[i, j-1] + b*array[i, j] + c*array[i, j+1]
 
         grad_view[i, n-1] = a*array[i, n-3] + b*array[i, n-2] + c*array[i, n-1]
@@ -101,8 +101,7 @@ def gradient2_order2_dx(float_type[:,::1] array, float_type dx):
     return gradient
 
 def gradient2_order2_var_x(float_type[:,::1] array, float_type[::1] x):
-    
-    gradient = np.zeros_like(array)
+    gradient = np.zeros((array.shape[0],array.shape[1]))
 
     cdef float_type[:,::1] grad_view = gradient
     cdef float_type dx1, dx2
@@ -122,7 +121,7 @@ def gradient2_order2_var_x(float_type[:,::1] array, float_type[::1] x):
 
         grad_view[i, 0] = a*array[i, 0] + b*array[i, 1] + c*array[i, 2]
 
-        for j in range(1, n-1):
+        for j in prange(1, n-1):
             dx1 = x[j] - x[j-1]
             dx2 = x[j+1] - x[j]
 

@@ -20,7 +20,7 @@ def gradient1_order2_dx(array: np.ndarray, dx: float):
         gradient[i, 0] = idx * \
             (-1.5*array[i, 0] + 2.*array[i, 1] - 0.5*array[i, 2])
 
-        for j in prange(1, array.shape[-1]-1):
+        for j in range(1, array.shape[-1]-1):
             gradient[i, j] = 0.5*idx*(- array[i, j-1] + array[i, j+1])
 
         gradient[i, -1] = idx * \
@@ -43,7 +43,7 @@ def gradient1_order2_var_x(array: np.ndarray, x: float):
 
         gradient[i, 0] = a*array[i, 0] + b*array[i, 1] + c*array[i, 2]
 
-        for j in prange(1, array.shape[-1]-1):
+        for j in range(1, array.shape[-1]-1):
             dx1 = x[j] - x[j-1]
             dx2 = x[j+1] - x[j]
 
@@ -73,7 +73,7 @@ def gradient2_order2_dx(array: np.ndarray, dx: float):
     for i in prange(array.shape[0]):
         gradient[i, 0] = a*array[i, 0] + b*array[i, 1] + c*array[i, 2]
 
-        for j in prange(1, array.shape[-1]-1):
+        for j in range(1, array.shape[-1]-1):
             gradient[i, j] = a*array[i, j-1] + b*array[i, j] + c*array[i, j+1]
 
         gradient[i, -1] = a*array[i, -3] + b*array[i, -2] + c*array[i, -1]
@@ -95,7 +95,7 @@ def gradient2_order2_var_x(array: np.ndarray, x: float):
 
         gradient[i, 0] = a*array[i, 0] + b*array[i, 1] + c*array[i, 2]
 
-        for j in prange(1, array.shape[-1]-1):
+        for j in range(1, array.shape[-1]-1):
             dx1 = x[j] - x[j-1]
             dx2 = x[j+1] - x[j]
 
