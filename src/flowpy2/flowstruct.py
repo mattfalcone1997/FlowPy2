@@ -23,12 +23,12 @@ logger = logging.getLogger(__name__)
 
 class FlowStructND(CommonArrayExtensions):
     _array_attr = '_array'
-
+    _HANDLED_TYPES = (Number, np.ndarray)
     def __init__(self,
                  coorddata: CoordStruct,
                  array: ArrayLike,
                  comps: Iterable[str],
-                 data_layout: Iterable[str],
+                 data_layout: Iterable[str] = None,
                  times: Iterable[Number] = None,
                  time_decimals: int = None,
                  array_backend: str=None,
@@ -38,8 +38,11 @@ class FlowStructND(CommonArrayExtensions):
                  copy=False,
                  **kwargs) -> None:
 
-        self._coords = self._set_coords(coorddata, data_layout)
+        if data_layout is None:
+            data_layout = tuple(coorddata.index)
         self._data_layout = tuple(data_layout)
+
+        self._coords = self._set_coords(coorddata, data_layout)
 
         self._comps = CompIndexer(comps)
         if times is not None:
@@ -66,7 +69,7 @@ class FlowStructND(CommonArrayExtensions):
         if array_backend is None:
             array_backend = fp2.rcParams['arrays.backend']  
         
-        self._array = self._set_array(array, array_backend, dtype, copy)
+        self._set_array(array, array_backend, dtype, copy)
         
         self._array_backend = array_backend
 
@@ -96,35 +99,37 @@ class FlowStructND(CommonArrayExtensions):
             array = creator(array, dtype=dtype)
 
         array = array.astype(dtype, copy=copy)
-
-        if self._times is None:
-            array = array.reshape((1, *array.shape))
-
-        ndim = len(self._data_layout) + 2
-
-        if array.ndim != ndim:
-            raise ValueError("array must have dimension "
-                             f"{ndim} not {array.ndim}")
-
-        for i, d in enumerate(self._data_layout):
+        
+        
+        for i, d in enumerate(self._data_layout[::-1],1):
             coordsize = self._coords[d].size
-            if array.shape[2+i] != coordsize:
-                raise ValueError(f"Shape of dimension {i} of array "
-                                 f"is invalid: {array.shape[2+i]} "
-                                 f"vs {coordsize}")
+            if array.shape[-i] != coordsize:
+                raise ValueError(f"Shape of dimension {array.ndim-i-1} "
+                                 "of input array is invalid: "
+                                 f"{array.shape[-i]} vs {coordsize}")
 
-        if self._times is not None:
-            if len(self._times) != array.shape[0]:
-                raise ValueError(f"Shape of dimension 0 of array "
-                                 f"is invalid: {array.shape[0]} "
-                                 f"vs {len(self._times)}")
+        ndim = len(self._data_layout)
+        if not (array.ndim == ndim and len(self._comps)) == 1:
+            loc =-ndim-1
+            if array.shape[loc] != len(self._comps):
+                raise ValueError(f"Shape of dimension 1 of array "
+                                f"is invalid: {array.shape[loc]} "
+                                f"vs {len(self._comps)}")
 
-        if array.shape[1] != len(self._comps):
-            raise ValueError(f"Shape of dimension 1 of array "
-                             f"is invalid: {array.shape[0]} "
-                             f"vs {len(self._comps)}")
+        time_size = 1 if self._times is None else len(self._times)
+        comp_size = len(self._comps)
 
-        return array
+        coord_shape = [self._coords[d].size for d in self._data_layout]
+
+        shape = (time_size, comp_size, *coord_shape)
+        try:
+            self._array = array.reshape(shape)
+        except ValueError:
+            if self._times is None:
+                raise ValueError(f"Array must be shape {shape} "
+                                 f"or {shape[1:]}") from None
+            else:
+                raise ValueError(f"Array must be shape {shape}") from None
 
     def reduce(self, operation: Callable, axis: str):
         coords = self.coords.copy()
@@ -190,12 +195,28 @@ class FlowStructND(CommonArrayExtensions):
     def ndim(self) -> int:
         return len(self._coords)
 
+    
+    def _fast_get_single_time(self,comp):
+        return self._array[0,self._comps.get(comp)]
+    
+    def _fast_get_many_time(self,time, comp):
+        return self._array[self._times.get(time),
+                           self._comps.get(comp)]
+    
     def get(self, *, time=None,
             comp=None,
             output_fs=True,
             squeeze=True,
             drop_coords=True,
             **coords_kw) -> Union[ArrayLike, FlowStructND]:
+        
+        #Note this routine needs a rewrite
+        if not coords_kw and squeeze and isinstance(comp, str):
+           
+           if self._times is None or len(self._times) == 1:
+               return self._fast_get_single_time(comp) 
+           elif isinstance(time, (Number, str)):
+               return self._fast_get_many_time(time, comp) 
 
         indexer = [slice(None)]*self._array.ndim
         shape = [None]*self._array.ndim
@@ -288,23 +309,57 @@ class FlowStructND(CommonArrayExtensions):
                             comp=key[1])
         elif self._times is None:
             return self.get(comp=key)
+        
+        elif len(self._times) == 1:
+            return self.get(comp=key)
+        
         else:
             raise KeyError("Invalid key")
 
     def __setitem__(self, key, value: np.ndarray):
 
-        if self.shape != value.shape:
-            raise ValueError("Setting array not correct shape: "
-                             f"{self.shape} vs {value.shape}")
-
+        
         if self.times is None:
-            index_comp, _, _ = self._process_comp_index(key)
-            self._array[0, index_comp] = value
+            
+            if key in self._comps:
+                if self.shape != value.shape:
+                    raise ValueError("Setting array not correct shape: "
+                                    f"{self.shape} vs {value.shape}")
+
+                index_comp, _, _ = self._process_comp_index(key)
+                self._array[0, index_comp] = value
+            else:
+                if isinstance(key, str):
+                    key = [key]
+                kwargs = self._init_args_from_kwargs(array=value,
+                                                     comps=key)
+                fstruct = self._create_struct(**kwargs)
+                self.concat_comps(fstruct, inplace=True)
 
         else:
-            index_comp, _, _ = self._process_comp_index(key[1])
-            index_time, _, _ = self._process_time_index(key[0])
-            self._array[index_time, index_comp] = value
+            time = key[0]
+            comp = key[1]
+            
+            if time in self._times and comp in self._comps:
+                if self.shape != value.shape:
+                    raise ValueError("Setting array not correct shape: "
+                                    f"{self.shape} vs {value.shape}")
+
+                index_comp, _, _ = self._process_comp_index(key[1])
+                index_time, _, _ = self._process_time_index(key[0])
+                self._array[index_time, index_comp] = value
+            else:
+                if isinstance(comp, str):
+                    comp = [comp]
+
+                if not hasattr(time, '__iter__'):
+                    time = [time]
+
+                kwargs = self._init_args_from_kwargs(array=value,
+                                                     comps=comp,
+                                                     times=time)
+                fstruct = self._create_struct(**kwargs)
+                self.concat(fstruct, inplace=True)
 
     def remove_times(self, times: Union[Number, Iterable[Number]]):
 
@@ -349,7 +404,7 @@ class FlowStructND(CommonArrayExtensions):
 
     def _process_comp_index(self, comp):
         if comp is None:
-            return slice(None), len(self._comps), len(self.comps) > 1
+            return slice(None), len(self._comps), True
 
         index = self._comps.get(comp)
 
@@ -376,23 +431,35 @@ class FlowStructND(CommonArrayExtensions):
 
     def _check_fstruct_compat(self, fstruct: FlowStructND,
                               check_times: bool = False,
-                              check_comps: bool = False):
+                              check_comps: bool = False,
+                              raise_error: bool = True):
 
+        compat=True
         if self.coords != fstruct.coords:
-            raise ValueError("Coordinates do not match")
-
+            if raise_error:
+                raise ValueError("Coordinates do not match")
+            compat=False
         if self._data_layout != fstruct._data_layout:
-            raise ValueError("Data layout do not match")
+            if raise_error:
+                raise ValueError("Data layout do not match")
+            compat=False
 
         if check_times:
-            if not np.array_equal(self.times, fstruct.times):
-                raise ValueError("Times do not match")
+            if self._times != fstruct._times:
+                if raise_error:
+                    raise ValueError("Times do not match")
+                compat=False
 
         if check_comps:
             if self.comps != fstruct.comps:
-                raise ValueError("Components do not match")
-
-    def concat_comps(self, fstructs: Union[FlowStructND, Iterable[FlowStructND]]) -> FlowStructND:
+                if raise_error:
+                    raise ValueError("Components do not match")
+                compat=False
+    
+        return compat
+    
+    def concat_comps(self, fstructs: Union[FlowStructND, Iterable[FlowStructND]],
+                     inplace=False) -> FlowStructND:
         if isinstance(fstructs, FlowStructND):
             fstructs = [fstructs]
 
@@ -405,14 +472,24 @@ class FlowStructND(CommonArrayExtensions):
             arrays.append(fstruct._array)
 
         new_data = np.concatenate(arrays, axis=1)
-        return self.__class__(self._coords,
-                              new_data,
-                              new_comps,
-                              data_layout=self._data_layout,
-                              times=self._times,
-                              array_backend=self._array_backend)
 
-    def concat_times(self, fstructs: Union[FlowStructND, Iterable[FlowStructND]]) -> FlowStructND:
+        if inplace:
+            logger.debug("Setting array inplace")
+
+            self._comps = new_comps
+            self._set_array(new_data,
+                            self._array_backend,
+                            dtype=self.dtype,
+                            copy=False)
+            return self
+        else:
+            logger.debug("Creating new flowstruct in concat")
+            kwargs = self._init_args_from_kwargs(array=new_data,
+                                                comps=new_comps)
+            return self._create_struct(**kwargs)
+
+    def concat_times(self, fstructs: Union[FlowStructND, Iterable[FlowStructND]],
+                     inplace=False) -> FlowStructND:
 
         if isinstance(fstructs, FlowStructND):
             fstructs = [fstructs]
@@ -434,13 +511,42 @@ class FlowStructND(CommonArrayExtensions):
         for indexer, fstruct in zip(indexers[1:], fstructs):
             new_data[indexer] = fstruct._array
 
-        return self.__class__(self._coords,
-                              new_data,
-                              self._comps,
-                              data_layout=self._data_layout,
-                              times=new_time_indexer,
-                              array_backend=self._array_backend)
+        if inplace:
+            logger.debug("Setting array inplace")
+            self._times = new_time_indexer
+            self._set_array(new_data,
+                            self._array_backend,
+                            dtype=self.dtype,
+                            copy=False)
+            return self
+        else:
+            logger.debug("Creating new flowstruct in concat")
+            kwargs = self._init_args_from_kwargs(array=new_data,
+                                                times=new_time_indexer)
+            return self._create_struct(**kwargs)
 
+    def concat(self, fstructs:  Union[FlowStructND, Iterable[FlowStructND]],
+               inplace=False) -> FlowStructND:
+        
+        if type(fstructs) == type(self):
+            fstructs = [fstructs]
+        #check types
+
+        if not all(type(self) == type(fstruct) for fstruct in fstructs):
+            raise ValueError("fstructs must be the same "
+                             "type or an iterable of them")
+        
+        if all(self._times == fstruct._times for fstruct in fstructs):
+            return self.concat_comps(fstructs, inplace=inplace)
+        
+        elif all(self._comps == fstruct._comps for fstruct in fstructs):
+            return self.concat_times(fstructs, inplace=inplace)
+        
+        else:
+            raise ValueError(f"{type(self).__name__} must have same comps or "
+                             "times to be concatenated")
+        
+        
     def copy(self) -> FlowStructND:
         return self.__class__(self._coords,
                               self._array,
@@ -658,7 +764,8 @@ class FlowStructND(CommonArrayExtensions):
                                  "appear in loc")
 
         else:
-            raise TypeError("Invalid type for location")
+            raise TypeError("Invalid type for "
+                            f"location ({type(loc).__name__})")
 
         if len(loc) != dim:
             raise ValueError(f"Size of loc should be {dim} not {len(loc)}")
@@ -854,7 +961,7 @@ class FlowStructND(CommonArrayExtensions):
     def to_vtk(self, time=None, comps=None):
 
         grid = self.coords.to_vtk()
-        if (self.times is not None or len(self.times) > 1) and time is None:
+        if not (self.times is None or len(self.times) == 1) and time is None:
             raise ValueError("There are multiple times, time must be present")
 
         if comps is None:
@@ -928,6 +1035,28 @@ class FlowStructND(CommonArrayExtensions):
                                              time_decimals=None)
         return self._create_struct(**kwargs)
     
+    def equals(self, other):
+        try:
+            self._check_fstruct_compat(other, True, True)
+        except ValueError:
+            return False
+        
+        return np.array_equal(self._array, other._array)
+    
+    def __eq__(self, other_datastruct):
+        return self.equals(other_datastruct)
+
+    def __ne__(self, other_datastruct):
+        return not self.equals(other_datastruct)
+
+    def _array_function_check_meta(self,fstruct: FlowStructND):
+        try:
+            self._check_fstruct_compat(fstruct, True, True)
+        except ValueError:
+            return False
+
+        return True
+          
 @FlowStructND.implements(np.array_equal)
 def array_equal(fstruct1: FlowStructND, fstruct2: FlowStructND, *args, **kwargs):
     try:
@@ -940,12 +1069,7 @@ def array_equal(fstruct1: FlowStructND, fstruct2: FlowStructND, *args, **kwargs)
 
 @FlowStructND.implements(np.allclose)
 def allclose(fstruct1: FlowStructND, fstruct2: FlowStructND, *args, **kwargs):
-    try:
-        fstruct1._check_fstruct_compat(fstruct2, True, True)
-    except ValueError:
-        return False
-
-    return np.allclose(fstruct1._array, fstruct2._array)
+    return fstruct1.equals(fstruct2)
 
 class _fstruct_slicer:
     def __init__(self, fstruct: FlowStructND):

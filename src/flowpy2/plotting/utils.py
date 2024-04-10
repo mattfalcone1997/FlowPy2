@@ -51,13 +51,16 @@ def update_prop_cycle(**kwargs):
     mpl.rcParams['axes.prop_cycle'] = cycler(**cycler_dict)
 
 
-default_prop_dict = dict(linestyle=['-', '--', '-.', ':'],
+_default_prop_dict = dict(linestyle=['-', '--', '-.', ':'],
                          marker=['x', '.', 'v', '^', '+'],
                          color='bgrcmyk')
 
+def set_default_prop_dict(mapping: dict):
+    _default_prop_dict.clear()
+    _default_prop_dict.update(mapping)
 
 def reset_prop_cycle(**kwargs):
-    update_prop_cycle(**default_prop_dict)
+    update_prop_cycle(**_default_prop_dict)
     update_prop_cycle(**kwargs)
 
 

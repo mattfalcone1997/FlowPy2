@@ -1,3 +1,4 @@
+from __future__ import annotations
 import numpy as np
 import numbers
 import copy
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class DataStruct(CommonArrayExtensions):
     _array_attr = '_data'
-
+    _HANDLED_TYPES = (numbers.Number, np.ndarray)
     def __init__(self,
                  data: Union[Iterable[np.ndarray], Dict[str, np.ndarray]],
                  index: Iterable[str] = None,
@@ -193,7 +194,19 @@ class DataStruct(CommonArrayExtensions):
                                      " does not have matching inputs")
 
     def equals(self, other_datastruct):
-        return np.allclose(self, other_datastruct)
+        try:
+            if self.index != other_datastruct.index:
+                logger.debug("Indices do not match")
+                return False
+
+            for d1, d2 in zip(self._data, other_datastruct._data):
+                if not np.allclose(d1, d2):
+                    logger.debug("data do not match")
+                    return False
+        except Exception:
+            return False
+
+        return True
 
     def __eq__(self, other_datastruct):
         return self.equals(other_datastruct)
@@ -244,19 +257,17 @@ class DataStruct(CommonArrayExtensions):
     def __repr__(self):
         return self._data.__str__()
 
+    def _array_function_check_meta(self,fstruct: DataStruct):
+        try:
+            self._check_fstruct_compat(fstruct, True, True)
+        except ValueError:
+            return False
+
+        return True
 
 @DataStruct.implements(np.allclose)
 def allclose(dstruct1: DataStruct, dstruct2: DataStruct, *args, **kwargs):
-    if dstruct1.index != dstruct2.index:
-        logger.debug("Indices do not match")
-        return False
-
-    for d1, d2 in zip(dstruct1._data, dstruct2._data):
-        if not np.allclose(d1, d2, *args, **kwargs):
-            logger.debug("data do not match")
-            return False
-
-    return True
+    return dstruct1 == dstruct2
 
 
 @DataStruct.implements(np.array_equal)

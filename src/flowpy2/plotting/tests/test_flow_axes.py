@@ -33,6 +33,9 @@ def test_twinx(fig_test: mpl.figure.Figure, fig_ref: mpl.figure.Figure):
     update_prop_cycle(c='br')
 
     ax_test1 = ax_test.twinx()
+    assert isinstance(ax_test1, type(ax_test)),\
+          "Test twinned axes are same type"
+
     ax_test.plot(x, y, marker='')
     ax_test.set_ylim([0, 200])
     ax_test1.plot(x, 2.*y, marker='')

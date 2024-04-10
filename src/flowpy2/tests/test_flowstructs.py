@@ -43,6 +43,9 @@ def test_valid_init(reference_fstruct):
     array = reference_fstruct._array.squeeze()
 
     FlowStructND(coords, array[0, ...],
+                 comps=comps)
+    
+    FlowStructND(coords, array[0, ...],
                  comps=comps,
                  data_layout='xyz')
 
@@ -336,6 +339,21 @@ def test_setitem(reference_fstruct):
     with pytest.raises(ValueError):
         reference_fstruct[100, 'u'] = array[:, :, :-1]
 
+    array = np.random.randn(3,1,*reference_fstruct.shape)
+    reference_fstruct[[100,200,300],'p' ] = array
+
+    print(reference_fstruct.comps)
+    ref2 = FlowStructND(reference_fstruct._coords,
+                        array=reference_fstruct._array,
+                        comps=['u','v','w','p'],
+                        times=[100,200,300],
+                        data_layout=reference_fstruct._data_layout)
+    
+    assert reference_fstruct == ref2
+
+    f1 = reference_fstruct.get(time=100,
+                               comp=slice('u','w'))
+    f1[100,'p'] = reference_fstruct[100,'p']
 
 def test_concat_comps(reference_fstruct):
     f1 = FlowStructND(reference_fstruct.coords,
@@ -352,6 +370,9 @@ def test_concat_comps(reference_fstruct):
 
     f3 = f1.concat_comps(f2)
     assert f3 == reference_fstruct
+
+    f1.concat_comps(f2, inplace=True)
+    assert f1 == reference_fstruct
 
     f1 = FlowStructND(reference_fstruct.coords,
                       reference_fstruct._array[:, :1],
@@ -385,6 +406,10 @@ def test_concat_times(reference_fstruct):
     f3 = f1.concat_times(f2)
     assert f3 == reference_fstruct
 
+    f1.concat_times(f2, inplace=True)
+    assert f1 == reference_fstruct
+
+
     f1 = FlowStructND(reference_fstruct.coords,
                       reference_fstruct._array[:1],
                       ['u', 'v', 'w'],
@@ -400,6 +425,70 @@ def test_concat_times(reference_fstruct):
     with pytest.raises(ValueError):
         f1.concat_times(f2)
 
+
+def test_concat(reference_fstruct):
+    f1 = FlowStructND(reference_fstruct.coords,
+                      reference_fstruct._array[:, :1],
+                      ['u'],
+                      'xyz',
+                      reference_fstruct.times)
+
+    f2 = FlowStructND(reference_fstruct.coords,
+                      reference_fstruct._array[:, 1:],
+                      ['v', 'w'],
+                      'xyz',
+                      reference_fstruct.times)
+    
+    f3 = f1.concat(f2)
+    assert f3 == reference_fstruct
+
+    f1.concat(f2, inplace=True)
+    assert f1 == reference_fstruct
+
+    f1 = FlowStructND(reference_fstruct.coords,
+                      reference_fstruct._array[:1],
+                      ['u', 'v', 'w'],
+                      'xyz',
+                      [100])
+
+    f2 = FlowStructND(reference_fstruct.coords,
+                      reference_fstruct._array[1:],
+                      ['u', 'v', 'w'],
+                      'xyz',
+                      [100, 300])
+
+    with pytest.raises(ValueError):
+        f1.concat(f2)
+
+    f1 = FlowStructND(reference_fstruct.coords,
+                    reference_fstruct._array[:, :1],
+                    ['u'],
+                    'xyz',
+                    reference_fstruct.times)
+
+    f2 = FlowStructND(reference_fstruct.coords,
+                      reference_fstruct._array[:, 1:],
+                      ['v', 'w'],
+                      'xyz',
+                      reference_fstruct.times)
+
+    f3 = f1.concat(f2)
+    assert f3 == reference_fstruct
+
+    f1 = FlowStructND(reference_fstruct.coords,
+                      reference_fstruct._array[:, :1],
+                      ['u'],
+                      'xyz',
+                      reference_fstruct.times)
+
+    f2 = FlowStructND(reference_fstruct.coords,
+                      reference_fstruct._array[:, 1:],
+                      ['u', 'w'],
+                      'xyz',
+                      reference_fstruct.times)
+
+    with pytest.raises(ValueError):
+        f1.concat(f2)
 
 def test_copy(reference_fstruct):
     f = reference_fstruct.copy()

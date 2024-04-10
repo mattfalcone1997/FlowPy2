@@ -48,8 +48,8 @@ def validate_tag(cls: type, g: Union[h5py.File, h5py.Group], tag_check):
         tag = g.attrs['type_tag']
     except KeyError:
         if tag_check != 'nocheck':
-            raise HDF5TagError(f"No tag found. Potentially "
-                               "invalid HDF5 File or Group.") from None
+            raise HDF5TagError(f"No tag found in file {g.file.name} at {g.name}. "
+                               "Potentially invalid HDF5 File or Group.") from None
         else:
             logger.debug("No tag found on group.")
             return

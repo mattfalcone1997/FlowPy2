@@ -1,12 +1,11 @@
 import numpy as np
 import logging
 import sympy
-
 from typing import Callable, Union
 from numbers import Number
 from .numba import gradient
 
-from matplotlib.rcsetup import validate_string
+from matplotlib.rcsetup import validate_any
 from math import ceil, floor
 logger = logging.getLogger(__name__)
 
@@ -16,8 +15,12 @@ _second_derivatives = dict()
 
 _default_method = [None]
 
+def _validate_gradient(val):
+    set_default_gradient(val)
+    return val
+
 _rc_params = {'default_method': 'numba2'}
-_rc_validators = {'default_method': validate_string}
+_rc_validators = {'default_method': _validate_gradient}
 
 def set_default_gradient(name: str):
     if name not in _first_derivatives:
@@ -45,8 +48,6 @@ def register_gradient(name: str, first_deriv: Callable,
     _second_derivatives[name] = second_deriv
 
 
-def reset_default():
-    set_default_gradient('numpy')
 
 
 def return_gradients():
@@ -62,7 +63,7 @@ def first_derivative(*args, method=None, **kwargs):
         method = _default_method[0]
 
     if method not in _first_derivatives:
-        raise ValueError("Invalid derivative method")
+        raise ValueError(f"Invalid derivative method {method}")
 
     return _first_derivatives[method](*args, **kwargs)
 
@@ -72,7 +73,7 @@ def second_derivative(*args, method=None, **kwargs):
         method = _default_method[0]
 
     if method not in _second_derivatives:
-        raise ValueError("Invalid derivative method")
+        raise ValueError(f"Invalid derivative method {method}")
 
     return _second_derivatives[method](*args, **kwargs)
 
@@ -248,6 +249,3 @@ def compute_FD_stencil(derivative, rhs_stencil, lhs_stencil=None, subs=None, use
         sol = sol.subs(subs)
 
     return sympy.simplify(sol) if simplify else sol
-
-
-reset_default()

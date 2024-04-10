@@ -211,7 +211,14 @@ class CompIndexer(IndexBase):
     @classmethod
     def from_hdf(cls, h5_obj: hdf5.H5_Group_File, key: str):
         return cls([key.decode('utf-8') for key in h5_obj[key]])
-
+    
+    def __contains__(self,val):
+        if isinstance(val, str):
+            return val in self._index
+        elif hasattr(val, '__iter__'):
+            return all(v in self._index for v in val)
+        else:
+            return False
     # def create_iterable_key(self, keys):
     #     if isinstance(keys, str):
     #         return [keys]
@@ -483,6 +490,21 @@ class TimeIndexer(IndexBase, NDArrayOperatorsMixin):
             return func
         return decorator
 
+    def __eq__(self,val):
+        if type(val) != type(self):
+            return False
+        
+        return np.array_equal(self._index, val._index)
+
+    def __ne__(self,val):
+        return not self.__eq__(val)
+    
+    def __contains__(self,val):
+        if hasattr(val, '__iter__'):
+            return all(v in self._index for v in val)
+        else:
+            return val in self._index
+        
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         for x in inputs:
             # Only support operations with instances of _HANDLED_TYPES.

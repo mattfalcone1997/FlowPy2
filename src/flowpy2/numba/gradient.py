@@ -10,7 +10,7 @@ _gradient_varx_signature = ['f8[:,:](f8[:,:], f8[:])',
                             'f4[:,:](f4[:,:], f4[:])']
 
 
-@njit(_gradient_dx_signature, parallel=True,
+@njit(parallel=True,
       error_model='numpy', cache=True)
 def gradient1_order2_dx(array: np.ndarray, dx: float):
     gradient = np.zeros_like(array)
@@ -29,7 +29,7 @@ def gradient1_order2_dx(array: np.ndarray, dx: float):
     return gradient
 
 
-@njit(_gradient_varx_signature, parallel=True, error_model='numpy', cache=True)
+@njit( parallel=True, error_model='numpy', cache=True)
 def gradient1_order2_var_x(array: np.ndarray, x: float):
     gradient = np.zeros_like(array)
 
@@ -63,7 +63,7 @@ def gradient1_order2_var_x(array: np.ndarray, x: float):
     return gradient
 
 
-@njit(_gradient_dx_signature, parallel=True, error_model='numpy', cache=True)
+@njit(parallel=True, error_model='numpy', cache=True)
 def gradient2_order2_dx(array: np.ndarray, dx: float):
     gradient = np.zeros_like(array)
     idx2 = 1./(dx*dx)
@@ -81,7 +81,7 @@ def gradient2_order2_dx(array: np.ndarray, dx: float):
     return gradient
 
 
-@njit(_gradient_varx_signature, parallel=True,
+@njit(parallel=True,
       error_model='numpy', cache=True)
 def gradient2_order2_var_x(array: np.ndarray, x: float):
     gradient = np.zeros_like(array)
@@ -115,7 +115,7 @@ def gradient2_order2_var_x(array: np.ndarray, x: float):
     return gradient
 
 
-@njit(_gradient_dx_signature, parallel=True,
+@njit(parallel=True,
       error_model='numpy', cache=True)
 def _rhs_gradient1_order6_dx(array: np.ndarray, dx: float):
     idx = 1./dx
@@ -160,7 +160,7 @@ def gradient1_order6_dx(array: np.ndarray, dx: float):
     return tdma_solve(ldiag, cdiag, rdiag, rhs)
 
 
-@njit(_gradient_dx_signature, parallel=True,
+@njit(parallel=True,
       error_model='numpy', cache=True)
 def _rhs_gradient2_order6_dx(array: np.ndarray, dx: float):
     idx2 = 1./(dx*dx)

@@ -109,7 +109,8 @@ class CoordStruct(DataStruct):
         self._flow_type = value
 
     def rescale(self, key: str, val: Number):
-        self._data[key] /= val
+        index = self.index.get(key)
+        self._data[index] /= val
 
     def plot_line(self, comp: str, data: Sequence, ax=None,
                   transform_xdata: Callable = None,
@@ -305,6 +306,16 @@ class CoordStruct(DataStruct):
 
         return StructuredGrid(X, Y, Z)
 
+    def equals(self,other_cstruct):
+
+        try:
+            if self.flow_type != other_cstruct.flow_type:
+                logger.debug("flow_type doesn't not match")
+                return False
+        except Exception:
+            return False
+        
+        return super().equals(other_cstruct)
 
 @CoordStruct.implements(np.allclose)
 def allclose(dstruct1: CoordStruct, dstruct2: CoordStruct, *args, **kwargs):

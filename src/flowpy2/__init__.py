@@ -11,7 +11,6 @@ from .gradient import (first_derivative,
                        second_derivative,
                        set_default_gradient,
                        register_gradient,
-                       reset_default,
                        return_gradients)
 from .arrays import HAVE_CUPY
 from .io import HAVE_NETCDF4
@@ -33,23 +32,20 @@ def _get_validators():
         validators[f'arrays.{k}'] = v
     return validators
 
-def _get_rc_defaults():
-    defaults = {}
+def _get_rc_defaults(rcparams: RcParams):
     from .gradient import _rc_params
     for k, v in _rc_params.items():
-        defaults[f'gradient.{k}'] = v
+        rcparams[f'gradient.{k}'] = v
 
     from .io import _rc_params
     for k, v in _rc_params.items():
-        defaults[f'io.{k}'] = v
+        rcparams[f'io.{k}'] = v
 
     from .arrays import _rc_params
     for k, v in _rc_params.items():
-        defaults[f'arrays.{k}'] = v
-
-    return defaults
+        rcparams[f'arrays.{k}'] = v
 
 
 rcParams = RcParams()
 rcParams.validate = _get_validators()
-dict.update(rcParams,_get_rc_defaults())
+_get_rc_defaults(rcParams)

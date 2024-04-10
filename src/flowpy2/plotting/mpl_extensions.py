@@ -45,6 +45,11 @@ class FlowAxes(mpl.axes.Axes):
 
     cplot = plot
 
+    def _make_twin_axes(self, *args, **kwargs):
+        if 'projection' not in kwargs:
+            kwargs['projection'] = 'FlowAxes'
+        return super()._make_twin_axes(*args, **kwargs)
+    
     def apply_func_contours(self, comp, func):
         quadmesh_list = [x for x in self.get_children()
                          if isinstance(x, mpl.collections.QuadMesh)]
