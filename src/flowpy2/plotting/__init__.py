@@ -7,4 +7,5 @@ from .mpl_extensions import (figure,
                              show,
                              close,
                              set_default_projection,
-                             FlowAxes)
+                             FlowAxes,
+                             promote_axes)

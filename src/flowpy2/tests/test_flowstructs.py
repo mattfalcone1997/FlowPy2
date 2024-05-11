@@ -342,7 +342,6 @@ def test_setitem(reference_fstruct):
     array = np.random.randn(3,1,*reference_fstruct.shape)
     reference_fstruct[[100,200,300],'p' ] = array
 
-    print(reference_fstruct.comps)
     ref2 = FlowStructND(reference_fstruct._coords,
                         array=reference_fstruct._array,
                         comps=['u','v','w','p'],

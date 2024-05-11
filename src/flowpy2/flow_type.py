@@ -7,9 +7,6 @@ from typing import Tuple, Callable, Mapping, Union
 from matplotlib.projections import get_projection_class
 from .plotting import subplots
 
-_symbols = {'CHANNEL': 0,
-            'BLAYER': 1}
-
 logger = logging.getLogger(__name__)
 
 
@@ -17,12 +14,11 @@ logger = logging.getLogger(__name__)
 # Store information on matplotlib axes projections
 # Quantities for computing gradients ->
 # laplacians, divergences etc
-
-
+    
 class FlowType:
     def __init__(self,
                  name: str,
-                 keys: Tuple[str],
+                 keys: Tuple[str]=None,
                  projection: str = None,
                  symbols: dict = None,
                  transform_cartesian: Callable = None,
@@ -30,14 +26,18 @@ class FlowType:
                  contour_processor: Callable=None):
 
         self._projection = projection
-        if not all(isinstance(key, str) for key in keys):
-            raise TypeError("All keys must be of type str")
-
-        if len(keys) != len(set(keys)):
-            raise ValueError("Keys cannot be repeated")
-
         self._name = name
-        self._base_keys = tuple(keys)
+
+        if keys is not None:
+            if not all(isinstance(key, str) for key in keys):
+                raise TypeError("All keys must be of type str")
+
+            if len(keys) != len(set(keys)):
+                raise ValueError("Keys cannot be repeated")
+
+            self._base_keys = tuple(keys)
+        else:
+            self._base_keys = None
 
         self._symbols = {}
         if symbols is not None:
@@ -49,9 +49,30 @@ class FlowType:
         self._plot_line_process = self._validate_line_data(plot_line_processor)
         self._contour_process = self._validate_line_data(contour_processor)
 
+
+    @property
+    def projection(self):
+        return self._projection
+
+    @property
+    def symbols(self):
+        return self._symbols
+
+    @property
+    def name(self)->str:
+        return self._name
+    
+    @property
+    def has_base_keys(self):
+        return self._base_keys is not None
+    
     def _validate_transform(self, transform_cartesian: Callable):
 
         if transform_cartesian is not None:
+            if not self.has_base_keys:
+               raise ValueError("Transform cannot be provided to "
+                                f"{type(self).__name__} without base keys")
+            
             if not callable(transform_cartesian):
                 raise TypeError("transform_cartesian must be callable or None")
 
@@ -76,7 +97,13 @@ class FlowType:
         return transform_cartesian
 
     def _validate_line_data(self,func: Union[Callable,None]):
-        if func is None: return None
+        if func is None:
+            return None
+
+        if not self.has_base_keys:
+            raise ValueError("line data process cannot be provided to "
+                            f"{type(self).__name__} without base keys")
+
 
         try:
             func('y',np.arange(50),np.arange(50),{})
@@ -87,7 +114,13 @@ class FlowType:
         return func
     
     def _validate_contour_data(self,func: Union[Callable,None]):
-        if func is None: return None
+        if func is None:
+            return None
+
+        if not self.has_base_keys:
+            raise ValueError("contour data process cannot be provided to "
+                            f"{type(self).__name__} without base keys")
+
 
         try:
             x = np.arange(50)
@@ -107,14 +140,11 @@ class FlowType:
             return input_grid
         else:
             return self._transform_cartesian(input_grid)
+    
+    def set_mpl_projection(self, projection: str):
+        get_projection_class(projection)
 
-    @property
-    def symbols(self):
-        return self._symbols
-
-    @property
-    def name(self)->str:
-        return self._name
+        self._projection = projection
 
     @property
     def is_time_type(self)->bool:
@@ -129,67 +159,10 @@ class FlowType:
     def Transform(self):
         return self._transform_cartesian
 
-    def set_mpl_projection(self, projection):
-        get_projection_class(projection)
-
-        self._projection = projection
-
-    @property
-    def projection(self):
-        return self._projection
-
     def validate_keys(self, keys):
         if not all(key in self._base_keys for key in keys):
             raise ValueError("Invalid key for flow "
                              f"type {self.__class__.__name__}")
-
-    # def to_hdf(self,  fn_or_obj, mode=None, key=None):
-    #     g = hdf5.make_group(fn_or_obj, mode, key)
-    #     hdf5.set_type_tag(type(self), g)
-
-    #     g.attrs['name'] = self._name
-    #     if self._projection is not None:
-    #         g.attrs['projection'] = self._projection
-
-    #     for k, v in self._symbols.items():
-    #         g.attrs[k] = v
-
-    #     g.create_dataset("base_keys", data=np.array(
-    #         self._base_keys, dtype=np.string_))
-
-    # def to_netcdf(self, g):
-    #     if self._projection is not None:
-    #         g.projection = np.string_(self._projection)
-
-    #     g.flowtype_name = np.string_(self._name)
-    #     g.base_keys = self._base_keys
-
-    #     for k, v in self._symbols.items():
-    #         attr_name = "flowtype_attr_%s" % k
-    #         setattr(g, attr_name, v)
-
-    # @classmethod
-    # def from_netcdf(cls, g):
-    #     if hasattr(g, 'projection'):
-    #         projection = str(g.projection)
-    #     else:
-    #         projection = None
-
-    #     name = str(g.flowtype_name)
-    #     base_keys = tuple(g.base_keys)
-
-    #     attrs = [key for key in g.__dict__.keys()
-    #              if 'flowtype_attr_' in key]
-    #     symbols = {}
-
-    #     for attr in attrs:
-    #         key = attr.split('flowtype_attr_')
-    #         symbols[key] = getattr(g, attr)
-
-    #     return cls(name,
-    #                tuple(base_keys),
-    #                projection=projection,
-    #                symbols=attrs)
 
     def __eq__(self, value: object) -> bool:
         if type(self) != type(value):
@@ -265,12 +238,12 @@ def register_flow_type(flow_type: FlowType):
     _flow_types[flow_type.name] = flow_type
 
     # add type for time as dimension
+    if flow_type.has_base_keys:
+        flow_type_time = copy.deepcopy(flow_type)
+        flow_type_time._base_keys += ('t',)
+        flow_type_time._name += " (time)"
 
-    flow_type_time = copy.deepcopy(flow_type)
-    flow_type_time._base_keys += ('t',)
-    flow_type_time._name += " (time)"
-
-    _flow_types[flow_type_time.name] = flow_type_time
+        _flow_types[flow_type_time.name] = flow_type_time
 
 
 def get_flow_type(name) -> FlowType:
@@ -280,6 +253,8 @@ def get_flow_type(name) -> FlowType:
 
     return _flow_types[name]
 
+register_flow_type(FlowType("Base",
+                                projection='FlowAxes'))
 
 register_flow_type(FlowType("Cartesian",
                             ('x', 'y', 'z'),

@@ -79,7 +79,7 @@ class CompIndexer(IndexBase):
     def _verify_index(self, index: Iterable[str]) -> List[str]:
         if isinstance(index, str):
             raise TypeError("Container for input index cannot "
-                            f"be str for {self.__class__.__name}")
+                            f"be str for {self.__class__.__name__}")
 
         for ind in index:
             if not isinstance(ind, str):
@@ -371,6 +371,34 @@ class TimeIndexer(IndexBase, NDArrayOperatorsMixin):
             return slice(start, stop)
         else:
             raise KeyError("Invalid key: must be Number, list or slice")
+
+    def find_nearest(self,times: Union[Number, List[Number], slice]):
+        self.__update_accessor_dict()
+
+        if isinstance(times, Number):
+            return self._index[np.argmin(abs(self._index - times))]
+
+        elif isinstance(times, list):
+            return [self.find_nearest(t) for t in times]
+            
+        elif isinstance(times, slice):
+            if times.start is None:
+                start = None
+            else:
+                start = self.find_nearest(times.start)
+
+            if times.stop is None:
+                stop = None
+            else:
+                stop = self.find_nearest(times.start)
+
+            
+            if times.step is not None:
+                raise ValueError("step not allowed for slice indexing")
+
+            return slice(start, stop)
+        else:
+            raise KeyError("Invalid times: must be Number, list or slice")
 
     def get_other(self, key):
         index = self.get(key)

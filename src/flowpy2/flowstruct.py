@@ -85,14 +85,17 @@ class FlowStructND(CommonArrayExtensions):
                                  "in coorddata")
 
         coorddata = coorddata.copy()
-
+        if not coorddata.is_consecutive:
+            raise ValueError("CoordStruct must be consecutive is used "
+                             f"in {type(self).__name__}")
+        
         for k in coorddata.index:
             if k not in data_layout:
                 del coorddata[k]
 
         return coorddata
 
-    def _set_array(self, array: ArrayLike, array_backend: str, dtype: Union[str, type], copy: bool) -> ArrayLike:
+    def _set_array(self, array: ArrayLike, array_backend: str, dtype: Union[str, type], copy: bool):
 
         creator = array_backends.get_creator(array_backend)
         if type(array).__module__ != creator.__module__:
@@ -972,16 +975,28 @@ class FlowStructND(CommonArrayExtensions):
 
         return grid
 
-    def window(self, method, *args, **kwargs):
+    def window(self, method, *args, inplace=False,**kwargs):
         if method == 'uniform':
-            data = self._window_uniform(*args, **kwargs)
+            data, times = self._window_uniform(*args, **kwargs)
+
+        elif method == 'avg_time':
+            data, times = self._window_avg_time(*args,**kwargs)
         else:
             raise NotImplementedError("Window method not implemented")
 
-        kwargs = self._init_args_from_kwargs(array=data)
-        return self._create_struct(**kwargs)
+        if inplace:
+            self._times = TimeIndexer(times)
+            self._set_array(data, self._array_backend,
+                            dtype=self.dtype, copy=False)
+            return self
+        else:
+            kwargs = self._init_args_from_kwargs(array=data,
+                                                times=times)
+            
 
-    def _window_uniform(self, hwidth, **kwargs):
+            return self._create_struct(**kwargs)
+
+    def _window_uniform(self, hwidth, *args, **kwargs):
         times = self.times
         if hasattr(hwidth,'__len__'):
             if len(hwidth) != len(times):
@@ -1008,7 +1023,31 @@ class FlowStructND(CommonArrayExtensions):
             data[j] = self.get(time=slice(ltime,utime),
                                squeeze=False, output_fs=False).mean(axis=0)
         
-        return data
+        return data, times
+    
+    def _window_avg_time(self,hwidth, avg_start):
+        times = self.times
+        t0 = times[0] + hwidth
+        t1 = times[-1] - hwidth
+        times = times[np.logical_and(times>t0,times<t1)]
+
+        shape = list(self._array.shape)
+        shape[0] = len(times)
+
+        data = np.zeros(shape, dtype=self.dtype)
+
+        for j, time in enumerate(times):
+
+            i1 = np.argmin(abs(self.times - (time + hwidth))) 
+            i0 = np.argmin(abs(self.times - (time - hwidth))) 
+            
+            T1 = self.times[i1] - avg_start
+            T0 = self.times[i0] - avg_start
+
+            data[j] = (T1*self._array[i1] - T0*self._array[i0])/(T1 - T0)
+        
+        return data, times
+    
     
     def time_to_ND(self)->FlowStructND:
         if self._times is None:

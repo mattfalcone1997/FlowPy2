@@ -40,13 +40,32 @@ def test_dstruct():
 
 def test_ascending(test_data, test_index):
     data = test_data.copy()
-    data[0] = test_data[0][::-1]
 
-    with pytest.raises(ValueError):
-        CoordStruct("Cartesian",
+    cs = CoordStruct("Cartesian",
+                    test_data,
+                    index=test_index)
+
+    assert cs.is_consecutive
+   
+    data[0] = test_data[0][::-1]
+    cs = CoordStruct("Cartesian",
                     data,
                     index=test_index)
 
+    assert cs.is_consecutive
+
+    n = test_data[0].size //2
+    d1 = np.concatenate([test_data[0][:n],
+                         test_data[0][n:][::-1]], 
+                        axis=0)
+    data[0][::2] = 2
+    data[0][1::2] = -2
+
+    cs = CoordStruct("Cartesian",
+                    data,
+                    index=test_index)
+    
+    assert not cs.is_consecutive
 
 def test_integer_index(test_dstruct):
     ind = test_dstruct.coord_index('x', 20)

@@ -3,7 +3,9 @@ import logging
 import sympy
 from typing import Callable, Union
 from numbers import Number
-from .numba import gradient
+
+import flowpy2.numba.gradient as nbgr
+import flowpy2.cython.gradient as cygr
 
 from matplotlib.rcsetup import validate_any
 from math import ceil, floor
@@ -106,9 +108,9 @@ def numba_gradient1_order2(array, *varargs, axis=None):
     if len(varargs) == 1:
         arr1 = _prepare_parallel(array, axis=axis)
         if isinstance(varargs[0], Number):
-            grad = gradient.gradient1_order2_dx(arr1, varargs[0])
+            grad = nbgr.gradient1_order2_dx(arr1, varargs[0])
         else:
-            grad = gradient.gradient1_order2_var_x(arr1, varargs[0])
+            grad = nbgr.gradient1_order2_var_x(arr1, varargs[0])
 
         return _prepare_return(grad, array, axis)
     else:
@@ -119,9 +121,9 @@ def numba_gradient2_order2(array, *varargs, axis=None):
     if len(varargs) == 1:
         arr1 = _prepare_parallel(array, axis=axis)
         if isinstance(varargs[0], Number):
-            grad = gradient.gradient2_order2_dx(arr1, varargs[0])
+            grad = nbgr.gradient2_order2_dx(arr1, varargs[0])
         else:
-            grad = gradient.gradient2_order2_var_x(arr1, varargs[0])
+            grad = nbgr.gradient2_order2_var_x(arr1, varargs[0])
 
         return _prepare_return(grad, array, axis)
     else:
@@ -136,9 +138,9 @@ def numba_gradient1_order6(array, *varargs, axis=None):
     if len(varargs) == 1:
         arr1 = _prepare_parallel(array, axis=axis)
         if isinstance(varargs[0], Number):
-            grad = gradient.gradient1_order6_dx(arr1, varargs[0])
+            grad = nbgr.gradient1_order6_dx(arr1, varargs[0])
         else:
-            grad = gradient.gradient1_order6_var_x(arr1, varargs[0])
+            grad = nbgr.gradient1_order6_var_x(arr1, varargs[0])
 
         return _prepare_return(grad, array, axis)
     else:
@@ -149,9 +151,9 @@ def numba_gradient2_order6(array, *varargs, axis=None):
     if len(varargs) == 1:
         arr1 = _prepare_parallel(array, axis=axis)
         if isinstance(varargs[0], Number):
-            grad = gradient.gradient2_order6_dx(arr1, varargs[0])
+            grad = nbgr.gradient2_order6_dx(arr1, varargs[0])
         else:
-            grad = gradient.gradient2_order6_var_x(arr1, varargs[0])
+            grad = nbgr.gradient2_order6_var_x(arr1, varargs[0])
 
         return _prepare_return(grad, array, axis)
     else:
@@ -161,6 +163,35 @@ def numba_gradient2_order6(array, *varargs, axis=None):
 register_gradient('numba6', numba_gradient1_order6,
                   numba_gradient2_order6)
 
+def cython_gradient1_order2(array, *varargs, axis=None):
+
+    if len(varargs) == 1:
+        arr1 = _prepare_parallel(array, axis=axis)
+        if isinstance(varargs[0], Number):
+            grad = cygr.gradient1_order2_dx(arr1, varargs[0])
+        else:
+            grad = cygr.gradient1_order2_var_x(arr1, varargs[0])
+
+        return _prepare_return(grad, array, axis)
+    else:
+        raise NotImplementedError("Cannot use multiple arrays yet")
+
+
+def cython_gradient2_order2(array, *varargs, axis=None):
+    if len(varargs) == 1:
+        arr1 = _prepare_parallel(array, axis=axis)
+        if isinstance(varargs[0], Number):
+            grad = cygr.gradient2_order2_dx(arr1, varargs[0])
+        else:
+            grad = cygr.gradient2_order2_var_x(arr1, varargs[0])
+
+        return _prepare_return(grad, array, axis)
+    else:
+        raise NotImplementedError("Cannot use multiple arrays yet")
+
+
+register_gradient('cython2', cython_gradient1_order2,
+                  cython_gradient2_order2)
 
 def compute_FD_stencil(derivative, rhs_stencil, lhs_stencil=None, subs=None, use_rational=True, simplify=True, method='LU'):
     rhs_stencil = np.array(rhs_stencil)

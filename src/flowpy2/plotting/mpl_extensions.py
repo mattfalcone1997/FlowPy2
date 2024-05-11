@@ -9,7 +9,8 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-from cycler import cycler
+from typing import Iterable, Union
+from cycler import Cycler
 
 import itertools
 import warnings
@@ -29,6 +30,13 @@ class FlowAxes(mpl.axes.Axes):
     name = 'FlowAxes'
 
     def plot(self, *args, scalex=True, scaley=True, data=None, **kwargs):
+        """
+        Same as parent function accept that it also increments 
+        the prop cycler on twinned axes without plotting. Probs could be
+        implemented more directly bu this uses the highest level way of "
+        doing it. Note that it won't work unless the twinned axes are 
+        created before this plot method is invoked.
+        """
         lines = super().plot(*args, scalex=scalex, scaley=scaley, data=data, **kwargs)
 
         twinned = [twin for twin in self._twinned_axes.get_siblings(
@@ -44,6 +52,9 @@ class FlowAxes(mpl.axes.Axes):
         return lines
 
     cplot = plot
+
+    def set_prop_cycle(self, cycler: Cycler=None):
+        self._get_lines.set_prop_cycle(cycler)
 
     def _make_twin_axes(self, *args, **kwargs):
         if 'projection' not in kwargs:
@@ -176,6 +187,35 @@ _default_projection = ['FlowAxes']
 def set_default_projection(projection):
     _default_projection[0] = projection
 
+def promote_axes(ax: Union[mpl.axes.Axes,Iterable[mpl.axes.Axes]],
+                 projection: str=None):
+    
+    scalar=False
+    if isinstance(ax, mpl.axes.Axes):
+        ax = [ax]
+        scalar = True
+
+    if projection is None:
+        projection = _default_projection[0]
+        
+    cls = mpl.projections.get_projection_class(projection)
+    
+    for i, a in enumerate(ax):
+        
+        if isinstance(a,cls):
+            continue
+        elif isinstance(a, mpl.axes.Axes):
+            s = a.__getstate__()
+            a1 = cls(a.figure, a.bbox.bounds)
+            a1.__setstate__(s)
+            ax[i] = a1
+        else:
+            raise TypeError("Must be an subclass of Axes or "
+                            "an iterable of Axes to promote")
+
+    return ax[0] if scalar else np.array(ax)
+
+        
 
 figure = plt.figure
 

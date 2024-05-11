@@ -7,8 +7,8 @@ from cython.parallel import parallel,prange
 import cython
 
 ctypedef fused float_type:
-    double
-    float
+    cnp.float64_t
+    cnp.float32_t
 
 def gradient1_order2_dx(float_type[:,::1] array, float_type dx):
     gradient = np.zeros((array.shape[0],array.shape[1]))
@@ -19,12 +19,13 @@ def gradient1_order2_dx(float_type[:,::1] array, float_type dx):
 
     m = grad_view.shape[0]
     n = grad_view.shape[1]
+
     for i in prange(m, nogil=True):
 
         grad_view[i, 0] = idx * \
             (-1.5*array[i, 0] + 2.*array[i, 1] - 0.5*array[i, 2])
 
-        for j in prange(1, n-1):
+        for j in range(1, n-1):
             grad_view[i, j] = 0.5*idx*(- array[i, j-1] + array[i, j+1])
 
         grad_view[i, n-1] = idx * \
@@ -53,7 +54,7 @@ def gradient1_order2_var_x(float_type[:,::1] array,float_type[::1] x):
 
         grad_view[i, 0] = a*array[i, 0] + b*array[i, 1] + c*array[i, 2]
 
-        for j in prange(1, n-1):
+        for j in range(1, n-1):
             dx1 = x[j] - x[j-1]
             dx2 = x[j+1] - x[j]
 
@@ -93,7 +94,7 @@ def gradient2_order2_dx(float_type[:,::1] array, float_type dx):
     for i in prange(m, nogil=True):
         grad_view[i, 0] = a*array[i, 0] + b*array[i, 1] + c*array[i, 2]
 
-        for j in prange(1, n-1):
+        for j in range(1, n-1):
             grad_view[i, j] = a*array[i, j-1] + b*array[i, j] + c*array[i, j+1]
 
         grad_view[i, n-1] = a*array[i, n-3] + b*array[i, n-2] + c*array[i, n-1]
@@ -121,7 +122,7 @@ def gradient2_order2_var_x(float_type[:,::1] array, float_type[::1] x):
 
         grad_view[i, 0] = a*array[i, 0] + b*array[i, 1] + c*array[i, 2]
 
-        for j in prange(1, n-1):
+        for j in range(1, n-1):
             dx1 = x[j] - x[j-1]
             dx2 = x[j+1] - x[j]
 

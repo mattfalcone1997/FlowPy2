@@ -1,7 +1,7 @@
 from .io import hdf5, netcdf
 import numpy as np
 import flowpy2 as fp2
-from .plotting import subplots
+from .plotting import subplots, promote_axes
 import logging
 from typing import Sequence, Union, Callable, Mapping
 from numbers import Number
@@ -24,13 +24,15 @@ class CoordStruct(DataStruct):
 
         self._flow_type = get_flow_type(flow_type)
         self._flow_type.validate_keys(self.index)
-        self._validate_coords()
 
-    def _validate_coords(self):
+    @property
+    def is_consecutive(self):
         for d in self._data:
             diff = np.diff(d)
-            if any(diff < 0):
-                raise ValueError("Coordinates must be in ascending order")
+            if not all(diff < 0) and not all(diff > 0):
+                return False
+            
+        return True
 
     def _init_args_from_kwargs(self, **kwargs):
         kwargs = super()._init_args_from_kwargs(**kwargs)
@@ -101,11 +103,14 @@ class CoordStruct(DataStruct):
     def flow_type(self,value: Union[str,FlowType]):
         if isinstance(value, str):
             value = get_flow_type(value)
+
+        if self._flow_type.has_base_keys:
+            old_base_keys = self._flow_type._base_keys
+            
+            if not all(val in value._base_keys for val in old_base_keys):
+                raise ValueError(f"{type(self).__name__} old base_keys "
+                                 "must all be in the new base keys")
         
-        old_base_keys = self._flow_type._base_keys
-        if not all(val in value._base_keys for val in old_base_keys):
-            raise ValueError("FlowType old base_keys must all "
-                             "be in the new base keys")
         self._flow_type = value
 
     def rescale(self, key: str, val: Number):
@@ -116,11 +121,7 @@ class CoordStruct(DataStruct):
                   transform_xdata: Callable = None,
                   fig_kw=None, **kwargs):
 
-        if ax is None:
-            if fig_kw is None:
-                fig_kw = {}
-
-            fig, ax = self._flow_type.subplots(**fig_kw)
+        ax = self._update_axes(ax, fig_kw)
 
         coords = self.get(comp)
 
@@ -166,10 +167,7 @@ class CoordStruct(DataStruct):
                 transform_ydata=None,
                 fig_kw=None, **kwargs):
 
-        if ax is None:
-            if fig_kw is None:
-                fig_kw = {}
-            fig, ax = self._flow_type.subplots(**fig_kw)
+        ax = self._update_axes(ax, fig_kw)
 
         xcoords, ycoords = self._get_coords_contour(plane,
                                                     transform_xdata,
@@ -188,10 +186,7 @@ class CoordStruct(DataStruct):
                  transform_ydata=None,
                  fig_kw=None, **kwargs):
 
-        if ax is None:
-            if fig_kw is None:
-                fig_kw = {}
-            fig, ax = self._flow_type.subplots(**fig_kw)
+        ax = self._update_axes(ax, fig_kw)
 
         xcoords, ycoords = self._get_coords_contour(plane, transform_xdata,
                                                     transform_ydata)
@@ -203,15 +198,22 @@ class CoordStruct(DataStruct):
                                                       kwargs)
         return ax.contourf(x, y, c.T, **kwargs)
 
+    def _update_axes(self,ax , fig_kw: Mapping):
+        if ax is None:
+            if fig_kw is None:
+                fig_kw = {}
+            fig, ax = self._flow_type.subplots(**fig_kw)
+        else:
+            ax = promote_axes(ax, projection=self._flow_type.projection)
+
+        return ax
+    
     def pcolormesh(self, plane: Sequence[str], data: np.ndarray, ax=None,
                    transform_xdata=None,
                    transform_ydata=None,
                    fig_kw: Mapping = None, **kwargs):
 
-        if ax is None:
-            if fig_kw is None:
-                fig_kw = {}
-            fig, ax = self._flow_type.subplots(**fig_kw)
+        ax = self._update_axes(ax, fig_kw)
 
         xcoords, ycoords = self._get_coords_contour(plane, transform_xdata,
                                                     transform_ydata)
