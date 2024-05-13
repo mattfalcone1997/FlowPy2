@@ -252,10 +252,11 @@ class DataStruct(CommonArrayExtensions):
         self._index.remove(keys)
 
     def __str__(self):
-        return self._data.__str__()
+        return "%s(index=%s)"%(type(self).__name__,
+                               list(self.index))
 
     def __repr__(self):
-        return self._data.__str__()
+        return self.__str__()
 
     def _array_function_check_meta(self,fstruct: DataStruct):
         try:

@@ -208,13 +208,6 @@ def test_netcdf(test_dstruct, test_filename):
     assert test_dstruct == dstruct2
 
 
-def test_subplots(test_dstruct: CoordStruct):
-
-    fig, ax = test_dstruct._flow_type.subplots()
-
-    assert hasattr(ax, 'normalise')
-
-
 def test_translate(test_dstruct: CoordStruct):
     test_dstruct.Translate(x=100)
     assert np.array_equal(test_dstruct['x'], np.arange(100, 200, dtype='f8'),)

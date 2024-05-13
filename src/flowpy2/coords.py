@@ -12,6 +12,7 @@ from .flow_type import (get_flow_type,
 from .gradient import (first_derivative,
                        second_derivative)
 from .indexers import CompIndexer
+from .plotting import subplots
 
 from pyvista import StructuredGrid
 logger = logging.getLogger(__name__)
@@ -121,7 +122,7 @@ class CoordStruct(DataStruct):
                   transform_xdata: Callable = None,
                   fig_kw=None, **kwargs):
 
-        ax = self._update_axes(ax, fig_kw)
+        ax = self._update_axes(ax, fig_kw, comp)
 
         coords = self.get(comp)
 
@@ -167,7 +168,7 @@ class CoordStruct(DataStruct):
                 transform_ydata=None,
                 fig_kw=None, **kwargs):
 
-        ax = self._update_axes(ax, fig_kw)
+        ax = self._update_axes(ax, fig_kw, tuple(plane))
 
         xcoords, ycoords = self._get_coords_contour(plane,
                                                     transform_xdata,
@@ -186,7 +187,7 @@ class CoordStruct(DataStruct):
                  transform_ydata=None,
                  fig_kw=None, **kwargs):
 
-        ax = self._update_axes(ax, fig_kw)
+        ax = self._update_axes(ax, fig_kw, tuple(plane))
 
         xcoords, ycoords = self._get_coords_contour(plane, transform_xdata,
                                                     transform_ydata)
@@ -198,13 +199,21 @@ class CoordStruct(DataStruct):
                                                       kwargs)
         return ax.contourf(x, y, c.T, **kwargs)
 
-    def _update_axes(self,ax , fig_kw: Mapping):
+    def _update_axes(self,ax , fig_kw: Mapping, loc: Union[str, Sequence]):
+        
+        projection = self.flow_type.projection(loc)
         if ax is None:
             if fig_kw is None:
                 fig_kw = {}
-            fig, ax = self._flow_type.subplots(**fig_kw)
+
+            subplots_kw = fig_kw.get('subplot_kw', {})
+            subplots_kw['projection'] = projection
+
+            fig_kw['subplot_kw'] = subplots_kw
+
+            _, ax = subplots(**fig_kw)
         else:
-            ax = promote_axes(ax, projection=self._flow_type.projection)
+            ax = promote_axes(ax, projection=projection)
 
         return ax
     
@@ -213,7 +222,7 @@ class CoordStruct(DataStruct):
                    transform_ydata=None,
                    fig_kw: Mapping = None, **kwargs):
 
-        ax = self._update_axes(ax, fig_kw)
+        ax = self._update_axes(ax, fig_kw, tuple(plane))
 
         xcoords, ycoords = self._get_coords_contour(plane, transform_xdata,
                                                     transform_ydata)
@@ -294,17 +303,20 @@ class CoordStruct(DataStruct):
     def copy(self):
         return self.__class__(self._flow_type.name, self.to_dict(), copy=True)
 
-    def to_vtk(self):
-        cart_grid = self._flow_type.transform(self)
+    def to_vtk(self, layout=None):
+        if layout is None:
+            layout = self.index
 
-        x = cart_grid['x']
-        y = cart_grid['y']
-        z = cart_grid['z']
+        args = [self.get(l) for l in layout]
+        grid = dict(zip(layout,
+                        np.meshgrid(*args,
+                                    indexing='ij')))
 
-        shape = (x.size, y.size, z.size)
-        X = np.ones(shape)*x[:, None, None]
-        Y = np.ones(shape)*y[None, :, None]
-        Z = np.ones(shape)*z[None, None, :]
+        cart_grid = self._flow_type.transform(grid)
+
+        X = cart_grid['x']
+        Y = cart_grid['y']
+        Z = cart_grid['z']
 
         return StructuredGrid(X, Y, Z)
 
@@ -315,9 +327,15 @@ class CoordStruct(DataStruct):
                 logger.debug("flow_type doesn't not match")
                 return False
         except Exception:
+            logger.debug("flow_type check resulted in exception")
             return False
         
         return super().equals(other_cstruct)
+
+    def __str__(self)->str:
+        return "%s(%s, index=%s)"%(type(self).__name__,
+                                  self._flow_type.name,
+                                 list(self.index))
 
 @CoordStruct.implements(np.allclose)
 def allclose(dstruct1: CoordStruct, dstruct2: CoordStruct, *args, **kwargs):

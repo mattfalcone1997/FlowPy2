@@ -1,6 +1,8 @@
 import numpy as np
 import logging
 import sympy
+from sympy.matrices import dotprodsimp
+
 from typing import Callable, Union
 from numbers import Number
 
@@ -270,7 +272,9 @@ def compute_FD_stencil(derivative, rhs_stencil, lhs_stencil=None, subs=None, use
     mat = sympy.Matrix(rows)
     rhs_vec = sympy.Matrix([0]*(nrows))
     rhs_vec[derivative] = 1
-    sol = mat.solve(rhs_vec, method=method)
+
+    with dotprodsimp(simplify):
+        sol = mat.solve(rhs_vec, method=method)
 
     if subs is not None:
         dx_names = [dx.name for dx in dx_list]

@@ -5,7 +5,6 @@ import logging
 import copy
 from typing import Tuple, Callable, Mapping, Union
 from matplotlib.projections import get_projection_class
-from .plotting import subplots
 
 logger = logging.getLogger(__name__)
 
@@ -19,13 +18,12 @@ class FlowType:
     def __init__(self,
                  name: str,
                  keys: Tuple[str]=None,
-                 projection: str = None,
+                 projection: Callable = None,
                  symbols: dict = None,
                  transform_cartesian: Callable = None,
                  plot_line_processor: Callable=None,
                  contour_processor: Callable=None):
-
-        self._projection = projection
+        
         self._name = name
 
         if keys is not None:
@@ -39,6 +37,8 @@ class FlowType:
         else:
             self._base_keys = None
 
+        self._projection = self._validate_projection(projection)
+        
         self._symbols = {}
         if symbols is not None:
             self._symbols.update(symbols)
@@ -50,9 +50,11 @@ class FlowType:
         self._contour_process = self._validate_line_data(contour_processor)
 
 
-    @property
-    def projection(self):
-        return self._projection
+    def projection(self, loc):
+        if isinstance(self._projection, str) or self._projection is None:
+            return self._projection
+        else:
+            return self._projection(loc)
 
     @property
     def symbols(self):
@@ -66,6 +68,27 @@ class FlowType:
     def has_base_keys(self):
         return self._base_keys is not None
     
+    def _validate_projection(self, func: Union[Callable, str]) -> Callable:
+            
+        if isinstance(func, str) or func is None:
+            return func
+        
+        if not self.has_base_keys:
+            raise ValueError("projection must be None or "
+                             "str is not base keys")
+        
+        try:
+            for key in self._base_keys:
+                func(key)
+
+            func(self._base_keys)
+        except Exception:
+            raise ValueError("Projection validation error") from None
+        
+        else:
+            return func
+
+
     def _validate_transform(self, transform_cartesian: Callable):
 
         if transform_cartesian is not None:
@@ -160,6 +183,9 @@ class FlowType:
         return self._transform_cartesian
 
     def validate_keys(self, keys):
+        if not self.has_base_keys:
+            return
+        
         if not all(key in self._base_keys for key in keys):
             raise ValueError("Invalid key for flow "
                              f"type {self.__class__.__name__}")
@@ -185,15 +211,6 @@ class FlowType:
             return False
 
         return True
-
-
-    def subplots(self, *args, **kwargs):
-        subplots_kw = kwargs.get('subplot_kw', {})
-        subplots_kw['projection'] = self.projection
-
-        kwargs['subplot_kw'] = subplots_kw
-
-        return subplots(*args, **kwargs)
 
     def __deepcopy__(self,memo):
         return self.__class__(self._name,
@@ -267,8 +284,15 @@ def _polar_to_cartesian(polar_data: Mapping):
 
     return {'x': x, 'y': y, 'z': z}
 
+def _polar_projection(proj):
+    if hasattr(proj, '__iter__'):
+        if 'theta' in proj and 'r' in proj:
+            return 'polar'
+    
+    return 'FlowAxes'
+
 
 register_flow_type(FlowType("Polar",
                             ('z', 'r', 'theta'),
-                            projection='polar',
+                            projection=_polar_projection,
                             transform_cartesian=_polar_to_cartesian))

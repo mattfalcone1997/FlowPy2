@@ -223,13 +223,14 @@ class FlowStructND(CommonArrayExtensions):
 
         indexer = [slice(None)]*self._array.ndim
         shape = [None]*self._array.ndim
+        
+        indexer[1], shape[1], out_fsc = self._process_comp_index(comp)
 
         if self._times is not None:
             indexer[0], shape[0], out_fst = self._process_time_index(time)
         else:
-            out_fst = True
+            out_fst = out_fsc
 
-        indexer[1], shape[1], out_fsc = self._process_comp_index(comp)
 
         out_fs = out_fsc or out_fst
         location = {}
@@ -963,7 +964,7 @@ class FlowStructND(CommonArrayExtensions):
 
     def to_vtk(self, time=None, comps=None):
 
-        grid = self.coords.to_vtk()
+        grid = self.coords.to_vtk(layout=self._data_layout)
         if not (self.times is None or len(self.times) == 1) and time is None:
             raise ValueError("There are multiple times, time must be present")
 
@@ -971,7 +972,7 @@ class FlowStructND(CommonArrayExtensions):
             comps = self.comps
 
         for comp in comps:
-            grid.point_data[comp] = np.ravel(self.get(time=time, comp=comp))
+            grid.point_data[comp] = np.ravel(self.get(time=time, comp=comp), order='F')
 
         return grid
 
@@ -1088,6 +1089,13 @@ class FlowStructND(CommonArrayExtensions):
     def __ne__(self, other_datastruct):
         return not self.equals(other_datastruct)
 
+    def __str__(self):
+        return "%s(%s, comps=%s, times=%s, shape=%s)"%(type(self).__name__,
+                                                    self.flow_type.name,
+                                                    list(self.comps),
+                                                    self.times,
+                                                    self.shape)
+    
     def _array_function_check_meta(self,fstruct: FlowStructND):
         try:
             self._check_fstruct_compat(fstruct, True, True)
