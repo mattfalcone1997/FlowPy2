@@ -8,7 +8,7 @@ import pytest
 from math import prod
 import numpy as np
 
-from test_hdf5 import test_filename
+from tempfile import NamedTemporaryFile
 
 
 @pytest.fixture
@@ -541,22 +541,27 @@ def test_translate(fstruct_with_times):
     assert all(f.coords['x'] > -50-0.5*np.diff(f.coords['x'])[0])
 
 
-def test_to_hdf(fstruct_with_times, test_filename):
+@loop_fstructs
+def test_to_hdf(fstruct, time, request):
+    fstruct = request.getfixturevalue(fstruct)
 
-    fstruct_with_times.to_hdf(test_filename, 'w')
+    with NamedTemporaryFile(suffix='.h5') as f:
+        fstruct.to_hdf(f.name, 'w')
 
-    fstruct2 = fstruct_with_times.__class__.from_hdf(test_filename)
+        fstruct2 = fstruct.__class__.from_hdf(f.name)
 
-    assert fstruct_with_times == fstruct2
+    assert fstruct == fstruct2
 
+@loop_fstructs
+def test_to_netcdf(fstruct, time, request):
+    fstruct = request.getfixturevalue(fstruct)
 
-def test_to_netcdf(fstruct_with_times, test_filename):
+    with NamedTemporaryFile(suffix='.h5') as f:
+        fstruct.to_netcdf(f.name, 'w')
 
-    fstruct_with_times.to_netcdf(test_filename, 'w')
+        fstruct2 = fstruct.__class__.from_netcdf(f.name)
 
-    fstruct2 = fstruct_with_times.__class__.from_netcdf(test_filename)
-
-    assert fstruct_with_times == fstruct2
+    assert fstruct == fstruct2
 
 
 def test_plot_exceptions(fstruct_with_times):

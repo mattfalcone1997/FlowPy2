@@ -467,6 +467,9 @@ class TimeIndexer(IndexBase, NDArrayOperatorsMixin):
 
     @classmethod
     def from_hdf(cls, h5_obj: hdf5.H5_Group_File, key: str):
+        if key not in h5_obj.keys():
+            return None
+        
         times = h5_obj[key][:]
         if 'decimals' in h5_obj.keys():
             decimals = h5_obj.attrs['decimals']

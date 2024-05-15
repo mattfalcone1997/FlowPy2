@@ -575,7 +575,9 @@ class FlowStructND(CommonArrayExtensions):
                          compression=compression)
 
         self._comps.to_hdf(g, 'comps')
-        self._times.to_hdf(g, 'times')
+
+        if self._times is not None:
+            self._times.to_hdf(g, 'times')
 
         self._coords.to_hdf(g, key='coords')
 
@@ -613,7 +615,9 @@ class FlowStructND(CommonArrayExtensions):
         coords = CoordStruct.from_hdf(g, 'coords', tag_check=tag_check)
         array = g['array'][:]
         comps = CompIndexer.from_hdf(g, 'comps')
+        
         times = TimeIndexer.from_hdf(g, 'times')
+        decimals = times.decimals if times is not None else None
 
         attrs = dict(g.attrs)
 
@@ -641,7 +645,7 @@ class FlowStructND(CommonArrayExtensions):
                                        comps=comps,
                                        data_layout=data_layout,
                                        times=times,
-                                       time_decimals=times.decimals,
+                                       decimals=decimals,
                                        array_backend=array_backend,
                                        attrs=attrs,
                                        location=location,
@@ -667,7 +671,7 @@ class FlowStructND(CommonArrayExtensions):
         dtype = self._array.dtype.kind + str(self._array.dtype.itemsize)
         for comp in self.comps:
             var = g.createVariable(comp, dtype, tuple(layout))
-            var[:] = self.get(comp=comp).values()
+            var[:] = self.get(comp=comp, output_fs=False)
 
         g.data_layout = self._data_layout
         g.comps = list(self._comps)
@@ -698,6 +702,8 @@ class FlowStructND(CommonArrayExtensions):
 
         coords = CoordStruct.from_netcdf(g)
         times = TimeIndexer.from_netcdf(g)
+        decimals = times.decimals if times is not None else None
+
         data_layout = g.data_layout
 
         comps = list(g.comps)
@@ -729,7 +735,7 @@ class FlowStructND(CommonArrayExtensions):
                                   comps=comps,
                                   data_layout=data_layout,
                                   times=times,
-                                  time_decimals=times.decimals,
+                                  decimals=decimals,
                                   array_backend=array_backend,
                                   attrs=attrs,
                                   location=location,
