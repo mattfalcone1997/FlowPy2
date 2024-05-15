@@ -4,6 +4,7 @@ from flowpy2.flow_type import get_flow_type
 from matplotlib.testing.decorators import check_figures_equal
 
 import pytest
+
 from math import prod
 import numpy as np
 
@@ -11,7 +12,7 @@ from test_hdf5 import test_filename
 
 
 @pytest.fixture
-def reference_fstruct():
+def fstruct_with_times():
     data = {'x': np.linspace(0, 100, 200),
             'y': np.linspace(0, 2, 50),
             'z': np.linspace(0, 6, 100)}
@@ -27,6 +28,23 @@ def reference_fstruct():
 
 
 @pytest.fixture
+def fstruct_time_None():
+    data = {'x': np.linspace(0, 100, 200),
+            'y': np.linspace(0, 2, 50),
+            'z': np.linspace(0, 6, 100)}
+    coords = CoordStruct("Cartesian",
+                         data)
+    times = None
+    comps = ['u', 'v', 'w']
+    size = prod([len(comps), *[d.size for d in data.values()]])
+    array_flat = np.arange(1, size+1, dtype='f8')
+    array = array_flat.reshape(
+        (len(comps), *[d.size for d in data.values()]))
+
+    return FlowStructND(coords, array, comps=comps, times=times, data_layout='xyz')
+
+
+@pytest.fixture
 def reference_coords():
     data = {'x': np.linspace(0, 100, 200),
             'y': np.linspace(0, 2, 50),
@@ -35,16 +53,25 @@ def reference_coords():
                        data)
 
 
-def test_valid_init(reference_fstruct):
+def loop_fstructs(func):
 
-    times = reference_fstruct.times
-    comps = reference_fstruct.comps
-    coords = reference_fstruct.coords
-    array = reference_fstruct._array.squeeze()
+    d = pytest.mark.parametrize("fstruct, time",
+                                [('fstruct_with_times', 100),
+                                 ('fstruct_time_None', None)])
+    return d(func)
+
+
+def test_valid_init(fstruct_with_times):
+
+    times = fstruct_with_times.times
+    comps = fstruct_with_times.comps
+    coords = fstruct_with_times.coords
+
+    array = fstruct_with_times._array.squeeze()
 
     FlowStructND(coords, array[0, ...],
                  comps=comps)
-    
+
     FlowStructND(coords, array[0, ...],
                  comps=comps,
                  data_layout='xyz')
@@ -82,18 +109,20 @@ def test_valid_init(reference_fstruct):
     assert test2.dtype == np.float32, "Check type"
     assert test1._coords == coords, "check CoordStruct"
     assert np.array_equal(test1._array, array), "Check main data"
+
     assert list(test1.times) == list(times), "Check times"
+
     assert test1.comps == comps, "Check comps"
     assert test1._data_layout == tuple('xyz'), "Check data layout"
 
 
-def test_invalid_init(reference_fstruct):
+def test_invalid_init(fstruct_with_times):
 
-    array = reference_fstruct._array.squeeze()
-    comps = reference_fstruct.comps
-    times = reference_fstruct.times
+    array = fstruct_with_times._array.squeeze()
+    comps = fstruct_with_times.comps
+    times = fstruct_with_times.times
 
-    coords = reference_fstruct.coords.copy()
+    coords = fstruct_with_times.coords.copy()
     coords.remove('z')
     with pytest.raises(ValueError):
 
@@ -113,310 +142,316 @@ def test_invalid_init(reference_fstruct):
                      attrs={'test': 'attr'})
 
     with pytest.raises(ValueError):
-        FlowStructND(reference_fstruct.coords, array,
+        FlowStructND(fstruct_with_times.coords, array,
                      comps=comps,
                      times=times,
                      data_layout='xzy',
                      attrs={'test': 'attr'})
 
     with pytest.raises(ValueError):
-        FlowStructND(reference_fstruct.coords, array,
+        FlowStructND(fstruct_with_times.coords, array,
                      comps=comps,
                      times=times[:len(times)//2],
                      data_layout='xyz',
                      attrs={'test': 'attr'})
 
     with pytest.raises(ValueError):
-        FlowStructND(reference_fstruct.coords, array,
+        FlowStructND(fstruct_with_times.coords, array,
                      comps=comps[:2],
                      times=times,
                      data_layout='xyz',
                      attrs={'test': 'attr'})
 
 
-def test_properties(reference_fstruct):
-    assert reference_fstruct.ndim == 3
-    assert reference_fstruct.shape == (200, 50, 100)
-    assert reference_fstruct.comps == ['u', 'v', 'w']
-    assert np.array_equal(reference_fstruct.times,
+def test_properties(fstruct_with_times):
+    assert fstruct_with_times.ndim == 3
+    assert fstruct_with_times.shape == (200, 50, 100)
+    assert fstruct_with_times.comps == ['u', 'v', 'w']
+    assert np.array_equal(fstruct_with_times.times,
                           np.array([100., 200., 300.]))
-    assert reference_fstruct.dtype == np.float64
-    assert reference_fstruct.flow_type is get_flow_type("Cartesian")
+    assert fstruct_with_times.dtype == np.float64
+    assert fstruct_with_times.flow_type is get_flow_type("Cartesian")
 
-    reference_fstruct.times = [200., 300., 400.]
-    assert np.array_equal(reference_fstruct.times,
+    fstruct_with_times.times = [200., 300., 400.]
+    assert np.array_equal(fstruct_with_times.times,
                           np.array([200., 300., 400.]))
-    reference_fstruct.times += 100
-    assert np.array_equal(reference_fstruct.times,
+    fstruct_with_times.times += 100
+    assert np.array_equal(fstruct_with_times.times,
                           np.array([300., 400., 500.]))
 
 
-def test_get_comps_times(reference_fstruct):
-    f = reference_fstruct.get(comp='u')
-    assert isinstance(f, type(reference_fstruct))
-    assert f.comps == ['u'], "Incorrect comps"
-    assert f.coords == reference_fstruct.coords
-    assert np.array_equal(f.get(comp='u', output_fs=False),
-                          reference_fstruct.get(comp='u', output_fs=False))
-    assert np.array_equal(f._array,
-                          reference_fstruct._array[:, [0]])
+def test_get_comps_times(fstruct_with_times):
 
-    f = reference_fstruct.get(time=100)
-    assert isinstance(f, type(reference_fstruct))
+    f = fstruct_with_times.get(comp=['u'])
+
+    assert isinstance(f, type(fstruct_with_times))
+    assert f.comps == ['u'], "Incorrect comps"
+    assert f.coords == fstruct_with_times.coords
+    assert np.array_equal(f.get(comp=['u'], output_fs=False),
+                          fstruct_with_times.get(comp=['u'], output_fs=False))
+    assert np.array_equal(f._array,
+                          fstruct_with_times._array[:, [0]])
+
+    f = fstruct_with_times.get(time=100)
+    assert isinstance(f, type(fstruct_with_times))
     assert f.comps == ['u', 'v', 'w'], "Incorrect comps"
     assert np.array_equal(f.times, np.array([100.])), "Incorrect comps"
-    assert f.coords == reference_fstruct.coords
-    assert np.array_equal(f._array, reference_fstruct._array[[0]])
+    assert f.coords == fstruct_with_times.coords
+    assert np.array_equal(f._array, fstruct_with_times._array[[0]])
     assert np.array_equal(f.get(time=100, output_fs=False),
-                          reference_fstruct.get(time=100, output_fs=False))
+                          fstruct_with_times.get(time=100, output_fs=False))
 
-    f = reference_fstruct.get(comp=slice('u', 'w'))
-    assert isinstance(f, type(reference_fstruct))
-    assert f.comps == reference_fstruct.comps, "Incorrect comps"
-    assert f.coords == reference_fstruct.coords
+    f = fstruct_with_times.get(comp=slice('u', 'w'))
+    assert isinstance(f, type(fstruct_with_times))
+    assert f.comps == fstruct_with_times.comps, "Incorrect comps"
+    assert f.coords == fstruct_with_times.coords
     assert np.array_equal(f._array,
-                          reference_fstruct._array)
+                          fstruct_with_times._array)
 
-    f = reference_fstruct.get(comp=slice('v', None))
-    assert isinstance(f, type(reference_fstruct))
+    f = fstruct_with_times.get(comp=slice('v', None))
+    assert isinstance(f, type(fstruct_with_times))
     assert f.comps == ['v', 'w'], "Incorrect comps"
-    assert f.coords == reference_fstruct.coords
+    assert f.coords == fstruct_with_times.coords
     assert np.array_equal(f._array,
-                          reference_fstruct._array[:, 1:, ...])
+                          fstruct_with_times._array[:, 1:, ...])
 
-    f = reference_fstruct.get(comp=['u', 'w'])
-    assert isinstance(f, type(reference_fstruct))
+    f = fstruct_with_times.get(comp=['u', 'w'])
+    assert isinstance(f, type(fstruct_with_times))
     assert f.comps == ['u', 'w'], "Incorrect comps"
-    assert f.coords == reference_fstruct.coords
+    assert f.coords == fstruct_with_times.coords
     assert np.array_equal(f.get(comp='u', output_fs=False),
-                          reference_fstruct.get(comp='u',
-                                                output_fs=False))
+                          fstruct_with_times.get(comp='u',
+                                                 output_fs=False))
     assert np.array_equal(f.get(comp='w', output_fs=False),
-                          reference_fstruct.get(comp='w',
+                          fstruct_with_times.get(comp='w',
                           output_fs=False))
 
-    f = reference_fstruct.get(time=100, comp='u')
+    f = fstruct_with_times.get(time=100, comp='u')
     assert isinstance(f, np.ndarray)
-    assert np.array_equal(f, reference_fstruct._array[0, 0])
+    assert np.array_equal(f, fstruct_with_times._array[0, 0])
 
-    f = reference_fstruct.get(time=[100, 200], comp='u')
-    assert isinstance(f, type(reference_fstruct))
+    f = fstruct_with_times.get(time=[100, 200], comp='u')
+    assert isinstance(f, type(fstruct_with_times))
     assert f.comps == ['u'], "Incorrect comps"
     assert np.array_equal(f.times, np.array([100, 200]))
-    assert np.array_equal(f._array, reference_fstruct._array[:2, [0]])
+    assert np.array_equal(f._array, fstruct_with_times._array[:2, [0]])
 
     # tests get when times is None: error used to occur here
-    f1 = FlowStructND(reference_fstruct.coords,
-                      reference_fstruct._array[0],
-                      reference_fstruct.comps,
-                      reference_fstruct._data_layout,
+    f1 = FlowStructND(fstruct_with_times.coords,
+                      fstruct_with_times._array[0],
+                      fstruct_with_times.comps,
+                      fstruct_with_times._data_layout,
                       times=None)
-    
-    
+
     f1.get(comp=['u', 'w'])
 
     with pytest.raises(KeyError):
-        reference_fstruct.get(comp='z')
+        fstruct_with_times.get(comp='z')
 
     with pytest.raises(KeyError):
-        reference_fstruct.get(comp=slice('u', 'z'))
+        fstruct_with_times.get(comp=slice('u', 'z'))
 
     with pytest.raises(KeyError):
-        reference_fstruct.get(comp=['u', 'z'])
+        fstruct_with_times.get(comp=['u', 'z'])
 
     with pytest.raises(ValueError):
-        reference_fstruct.get(comp=slice('v', 'u'))
+        fstruct_with_times.get(comp=slice('v', 'u'))
 
     with pytest.raises(ValueError):
-        reference_fstruct.get(comp=slice('u', 'v', 1))
+        fstruct_with_times.get(comp=slice('u', 'v', 1))
 
     with pytest.raises(KeyError):
-        reference_fstruct.get(time=150)
+        fstruct_with_times.get(time=150)
 
     with pytest.raises(KeyError):
-        reference_fstruct.get(time=[100, 400])
+        fstruct_with_times.get(time=[100, 400])
 
     with pytest.raises(ValueError):
-        reference_fstruct.get(time=slice(200, 100))
+        fstruct_with_times.get(time=slice(200, 100))
 
     with pytest.raises(ValueError):
-        reference_fstruct.get(time=slice(100, 200, 1))
+        fstruct_with_times.get(time=slice(100, 200, 1))
 
 
-def test_get_coords(reference_fstruct):
-    f = reference_fstruct.get(x=slice(0, 50))
+def test_get_coords(fstruct_with_times):
+    f = fstruct_with_times.get(x=slice(0, 50))
     assert all(f.coords['x'] < 50+0.5*np.diff(f.coords['x'])[0])
-    f = reference_fstruct.get(y=slice(0, 1))
+    f = fstruct_with_times.get(y=slice(0, 1))
     assert all(f.coords['y'] < 1+0.5*np.diff(f.coords['y'])[0])
 
-    f = reference_fstruct.get(x=slice(0, 50), y=slice(0, 1))
+    f = fstruct_with_times.get(x=slice(0, 50), y=slice(0, 1))
     assert all(f.coords['x'] < 50+0.5*np.diff(f.coords['x'])[0])
     assert all(f.coords['y'] < 1+0.5*np.diff(f.coords['y'])[0])
 
-    f = reference_fstruct.get(x=50)
+    f = fstruct_with_times.get(x=50)
     assert 'x' not in f.coords.index
-    assert np.array_equal(f._array, reference_fstruct._array[:, :, 100])
+    assert np.array_equal(f._array, fstruct_with_times._array[:, :, 100])
 
-    f = reference_fstruct.get(x=50, y=1)
+    f = fstruct_with_times.get(x=50, y=1)
     assert 'x' not in f.coords.index
     assert 'y' not in f.coords.index
-    assert np.array_equal(f._array, reference_fstruct._array[:, :, 100, 24])
+    assert np.array_equal(f._array, fstruct_with_times._array[:, :, 100, 24])
 
-    f = reference_fstruct.get(x=50, y=slice(0, 1))
+    f = fstruct_with_times.get(x=50, y=slice(0, 1))
     assert 'x' not in f.coords.index
 
-    f = reference_fstruct.get(comp='u', x=50, y=slice(0, 1))
+    f = fstruct_with_times.get(comp='u', x=50, y=slice(0, 1))
 
     with pytest.raises(ValueError):
-        f = reference_fstruct.get(x=slice(None, 101))
+        f = fstruct_with_times.get(x=slice(None, 101))
     with pytest.raises(ValueError):
-        f = reference_fstruct.get(x=slice(-0.5, None))
+        f = fstruct_with_times.get(x=slice(-0.5, None))
 
-def test_slice(reference_fstruct):
-    f = reference_fstruct.slice[0:50]
+
+def test_slice(fstruct_with_times):
+    f = fstruct_with_times.slice[0:50]
     assert all(f.coords['x'] < 50+0.5*np.diff(f.coords['x'])[0])
-    f = reference_fstruct.slice[:,0:1]
+    f = fstruct_with_times.slice[:, 0:1]
     assert all(f.coords['y'] < 1+0.5*np.diff(f.coords['y'])[0])
 
-    f = reference_fstruct.slice[0:50,0:1]
+    f = fstruct_with_times.slice[0:50, 0:1]
     assert all(f.coords['x'] < 50+0.5*np.diff(f.coords['x'])[0])
     assert all(f.coords['y'] < 1+0.5*np.diff(f.coords['y'])[0])
 
-    f = reference_fstruct.slice[50]
+    f = fstruct_with_times.slice[50]
     assert 'x' not in f.coords.index
-    assert np.array_equal(f._array, reference_fstruct._array[:, :, 100])
+    assert np.array_equal(f._array, fstruct_with_times._array[:, :, 100])
 
-    f = reference_fstruct.slice[50,1]
+    f = fstruct_with_times.slice[50, 1]
     assert 'x' not in f.coords.index
     assert 'y' not in f.coords.index
-    assert np.array_equal(f._array, reference_fstruct._array[:, :, 100, 24])
+    assert np.array_equal(f._array, fstruct_with_times._array[:, :, 100, 24])
 
-    f = reference_fstruct.slice[50, 0:1]
+    f = fstruct_with_times.slice[50, 0:1]
     assert 'x' not in f.coords.index
 
     with pytest.raises(ValueError):
-        f = reference_fstruct.slice[:101]
+        f = fstruct_with_times.slice[:101]
     with pytest.raises(ValueError):
-        f = reference_fstruct.slice[-0.5:]
+        f = fstruct_with_times.slice[-0.5:]
 
-def test_reduce(reference_fstruct):
-    sum_op = reference_fstruct.reduce(np.sum, axis='z')
-    sum_array = reference_fstruct._array.sum(axis=-1)
-    assert sum_op.comps == reference_fstruct.comps
-    assert np.array_equal(sum_op.times, reference_fstruct.times)
+
+def test_reduce(fstruct_with_times):
+    sum_op = fstruct_with_times.reduce(np.sum, axis='z')
+    sum_array = fstruct_with_times._array.sum(axis=-1)
+    assert sum_op.comps == fstruct_with_times.comps
+    assert np.array_equal(sum_op.times, fstruct_with_times.times)
     assert np.array_equal(sum_array, sum_op._array)
 
 
-def test_ufuncs(reference_fstruct):
-    sqrt_op = np.sqrt(reference_fstruct)
-    assert np.array_equal(np.sqrt(reference_fstruct._array),
+def test_ufuncs(fstruct_with_times):
+    sqrt_op = np.sqrt(fstruct_with_times)
+    assert np.array_equal(np.sqrt(fstruct_with_times._array),
                           sqrt_op._array)
 
 
-def test_functions(reference_fstruct):
+def test_functions(fstruct_with_times):
 
     with pytest.raises(TypeError):
-        np.tensordot(reference_fstruct, reference_fstruct)
+        np.tensordot(fstruct_with_times, fstruct_with_times)
 
-    np.allclose(reference_fstruct, reference_fstruct)
+    np.allclose(fstruct_with_times, fstruct_with_times)
 
-    np.array_equal(reference_fstruct, reference_fstruct)
+    np.array_equal(fstruct_with_times, fstruct_with_times)
 
 
-def test_getitem(reference_fstruct):
-    f1 = reference_fstruct.get(time=100, comp='u')
-    f2 = reference_fstruct[100, 'u']
+def test_getitem(fstruct_with_times):
+    f1 = fstruct_with_times.get(time=100, comp='u')
+    f2 = fstruct_with_times[100, 'u']
 
     assert np.array_equal(f1, f2)
 
 
-def test_setitem(reference_fstruct):
-    array = np.random.randn(*reference_fstruct.shape)
-    reference_fstruct[100, 'u'] = array
+def test_setitem(fstruct_with_times):
+    array = np.random.randn(*fstruct_with_times.shape)
+    fstruct_with_times[100, 'u'] = array
 
-    assert np.array_equal(reference_fstruct[100, 'u'], array)
+    assert np.array_equal(fstruct_with_times[100, 'u'], array)
 
     with pytest.raises(ValueError):
-        reference_fstruct[100, 'u'] = array[:, :, :-1]
+        fstruct_with_times[100, 'u'] = array[:, :, :-1]
 
-    array = np.random.randn(3,1,*reference_fstruct.shape)
-    reference_fstruct[[100,200,300],'p' ] = array
+    array = np.random.randn(3, 1, *fstruct_with_times.shape)
+    fstruct_with_times[[100, 200, 300], 'p'] = array
 
-    ref2 = FlowStructND(reference_fstruct._coords,
-                        array=reference_fstruct._array,
-                        comps=['u','v','w','p'],
-                        times=[100,200,300],
-                        data_layout=reference_fstruct._data_layout)
-    
-    assert reference_fstruct == ref2
+    ref2 = FlowStructND(fstruct_with_times._coords,
+                        array=fstruct_with_times._array,
+                        comps=['u', 'v', 'w', 'p'],
+                        times=[100, 200, 300],
+                        data_layout=fstruct_with_times._data_layout)
 
-    f1 = reference_fstruct.get(time=100,
-                               comp=slice('u','w'))
-    f1[100,'p'] = reference_fstruct[100,'p']
+    assert fstruct_with_times == ref2
 
-def test_concat_comps(reference_fstruct):
-    f1 = FlowStructND(reference_fstruct.coords,
-                      reference_fstruct._array[:, :1],
+    f1 = fstruct_with_times.get(time=100,
+                                comp=slice('u', 'w'))
+    f1[100, 'p'] = fstruct_with_times[100, 'p']
+
+
+@loop_fstructs
+def test_concat_comps(fstruct, time, request):
+
+    fstruct = request.getfixturevalue(fstruct)
+    f1 = FlowStructND(fstruct.coords,
+                      fstruct._array[:, :1],
                       ['u'],
                       'xyz',
-                      reference_fstruct.times)
+                      fstruct.times)
 
-    f2 = FlowStructND(reference_fstruct.coords,
-                      reference_fstruct._array[:, 1:],
+    f2 = FlowStructND(fstruct.coords,
+                      fstruct._array[:, 1:],
                       ['v', 'w'],
                       'xyz',
-                      reference_fstruct.times)
+                      fstruct.times)
 
     f3 = f1.concat_comps(f2)
-    assert f3 == reference_fstruct
+    assert f3 == fstruct
 
     f1.concat_comps(f2, inplace=True)
-    assert f1 == reference_fstruct
+    assert f1 == fstruct
 
-    f1 = FlowStructND(reference_fstruct.coords,
-                      reference_fstruct._array[:, :1],
+    f1 = FlowStructND(fstruct.coords,
+                      fstruct._array[:, :1],
                       ['u'],
                       'xyz',
-                      reference_fstruct.times)
+                      fstruct.times)
 
-    f2 = FlowStructND(reference_fstruct.coords,
-                      reference_fstruct._array[:, 1:],
+    f2 = FlowStructND(fstruct.coords,
+                      fstruct._array[:, 1:],
                       ['u', 'w'],
                       'xyz',
-                      reference_fstruct.times)
+                      fstruct.times)
 
     with pytest.raises(ValueError):
         f1.concat_comps(f2)
 
 
-def test_concat_times(reference_fstruct):
-    f1 = FlowStructND(reference_fstruct.coords,
-                      reference_fstruct._array[:1],
+def test_concat_times(fstruct_with_times):
+    f1 = FlowStructND(fstruct_with_times.coords,
+                      fstruct_with_times._array[:1],
                       ['u', 'v', 'w'],
                       'xyz',
-                      reference_fstruct.times[:1])
+                      fstruct_with_times.times[:1])
 
-    f2 = FlowStructND(reference_fstruct.coords,
-                      reference_fstruct._array[1:],
+    f2 = FlowStructND(fstruct_with_times.coords,
+                      fstruct_with_times._array[1:],
                       ['u', 'v', 'w'],
                       'xyz',
-                      reference_fstruct.times[1:])
+                      fstruct_with_times.times[1:])
 
     f3 = f1.concat_times(f2)
-    assert f3 == reference_fstruct
+    assert f3 == fstruct_with_times
 
     f1.concat_times(f2, inplace=True)
-    assert f1 == reference_fstruct
+    assert f1 == fstruct_with_times
 
-
-    f1 = FlowStructND(reference_fstruct.coords,
-                      reference_fstruct._array[:1],
+    f1 = FlowStructND(fstruct_with_times.coords,
+                      fstruct_with_times._array[:1],
                       ['u', 'v', 'w'],
                       'xyz',
                       [100])
 
-    f2 = FlowStructND(reference_fstruct.coords,
-                      reference_fstruct._array[1:],
+    f2 = FlowStructND(fstruct_with_times.coords,
+                      fstruct_with_times._array[1:],
                       ['u', 'v', 'w'],
                       'xyz',
                       [100, 300])
@@ -425,33 +460,33 @@ def test_concat_times(reference_fstruct):
         f1.concat_times(f2)
 
 
-def test_concat(reference_fstruct):
-    f1 = FlowStructND(reference_fstruct.coords,
-                      reference_fstruct._array[:, :1],
+def test_concat(fstruct_with_times):
+    f1 = FlowStructND(fstruct_with_times.coords,
+                      fstruct_with_times._array[:, :1],
                       ['u'],
                       'xyz',
-                      reference_fstruct.times)
+                      fstruct_with_times.times)
 
-    f2 = FlowStructND(reference_fstruct.coords,
-                      reference_fstruct._array[:, 1:],
+    f2 = FlowStructND(fstruct_with_times.coords,
+                      fstruct_with_times._array[:, 1:],
                       ['v', 'w'],
                       'xyz',
-                      reference_fstruct.times)
-    
+                      fstruct_with_times.times)
+
     f3 = f1.concat(f2)
-    assert f3 == reference_fstruct
+    assert f3 == fstruct_with_times
 
     f1.concat(f2, inplace=True)
-    assert f1 == reference_fstruct
+    assert f1 == fstruct_with_times
 
-    f1 = FlowStructND(reference_fstruct.coords,
-                      reference_fstruct._array[:1],
+    f1 = FlowStructND(fstruct_with_times.coords,
+                      fstruct_with_times._array[:1],
                       ['u', 'v', 'w'],
                       'xyz',
                       [100])
 
-    f2 = FlowStructND(reference_fstruct.coords,
-                      reference_fstruct._array[1:],
+    f2 = FlowStructND(fstruct_with_times.coords,
+                      fstruct_with_times._array[1:],
                       ['u', 'v', 'w'],
                       'xyz',
                       [100, 300])
@@ -459,247 +494,293 @@ def test_concat(reference_fstruct):
     with pytest.raises(ValueError):
         f1.concat(f2)
 
-    f1 = FlowStructND(reference_fstruct.coords,
-                    reference_fstruct._array[:, :1],
-                    ['u'],
-                    'xyz',
-                    reference_fstruct.times)
-
-    f2 = FlowStructND(reference_fstruct.coords,
-                      reference_fstruct._array[:, 1:],
-                      ['v', 'w'],
-                      'xyz',
-                      reference_fstruct.times)
-
-    f3 = f1.concat(f2)
-    assert f3 == reference_fstruct
-
-    f1 = FlowStructND(reference_fstruct.coords,
-                      reference_fstruct._array[:, :1],
+    f1 = FlowStructND(fstruct_with_times.coords,
+                      fstruct_with_times._array[:, :1],
                       ['u'],
                       'xyz',
-                      reference_fstruct.times)
+                      fstruct_with_times.times)
 
-    f2 = FlowStructND(reference_fstruct.coords,
-                      reference_fstruct._array[:, 1:],
+    f2 = FlowStructND(fstruct_with_times.coords,
+                      fstruct_with_times._array[:, 1:],
+                      ['v', 'w'],
+                      'xyz',
+                      fstruct_with_times.times)
+
+    f3 = f1.concat(f2)
+    assert f3 == fstruct_with_times
+
+    f1 = FlowStructND(fstruct_with_times.coords,
+                      fstruct_with_times._array[:, :1],
+                      ['u'],
+                      'xyz',
+                      fstruct_with_times.times)
+
+    f2 = FlowStructND(fstruct_with_times.coords,
+                      fstruct_with_times._array[:, 1:],
                       ['u', 'w'],
                       'xyz',
-                      reference_fstruct.times)
+                      fstruct_with_times.times)
 
     with pytest.raises(ValueError):
         f1.concat(f2)
 
-def test_copy(reference_fstruct):
-    f = reference_fstruct.copy()
+
+def test_copy(fstruct_with_times):
+    f = fstruct_with_times.copy()
 
     assert not np.shares_memory(f._array,
-                                reference_fstruct._array), \
+                                fstruct_with_times._array), \
         "Ensure this one is a view"
 
 
-def test_translate(reference_fstruct):
-    f = reference_fstruct
+def test_translate(fstruct_with_times):
+    f = fstruct_with_times
     f.Translate(x=-50)
 
     assert all(f.coords['x'] < 50+0.5*np.diff(f.coords['x'])[0])
     assert all(f.coords['x'] > -50-0.5*np.diff(f.coords['x'])[0])
 
 
-def test_to_hdf(reference_fstruct, test_filename):
+def test_to_hdf(fstruct_with_times, test_filename):
 
-    reference_fstruct.to_hdf(test_filename, 'w')
+    fstruct_with_times.to_hdf(test_filename, 'w')
 
-    fstruct2 = reference_fstruct.__class__.from_hdf(test_filename)
+    fstruct2 = fstruct_with_times.__class__.from_hdf(test_filename)
 
-    assert reference_fstruct == fstruct2
+    assert fstruct_with_times == fstruct2
 
 
-def test_to_netcdf(reference_fstruct, test_filename):
+def test_to_netcdf(fstruct_with_times, test_filename):
 
-    reference_fstruct.to_netcdf(test_filename, 'w')
+    fstruct_with_times.to_netcdf(test_filename, 'w')
 
-    fstruct2 = reference_fstruct.__class__.from_netcdf(test_filename)
+    fstruct2 = fstruct_with_times.__class__.from_netcdf(test_filename)
 
-    assert reference_fstruct == fstruct2
+    assert fstruct_with_times == fstruct2
 
-def test_plot_exceptions(reference_fstruct):
 
-    struct1d = reference_fstruct.get(x=50,z=3)
-    struct2d = reference_fstruct.get(y=1)
+def test_plot_exceptions(fstruct_with_times):
 
-    with pytest.raises(ValueError):
-        struct1d.plot_line('u','y')
+    struct1d = fstruct_with_times.get(x=50, z=3)
+    struct2d = fstruct_with_times.get(y=1)
 
     with pytest.raises(ValueError):
-        struct2d.pcolormesh('u','xz')
-
-    with pytest.warns(UserWarning):
-        struct1d.plot_line('u','x',time=100)
-
-    with pytest.warns(UserWarning):
-        struct1d.plot_line('u',loc=2,time=100)
-
-    with pytest.warns(UserWarning):
-        struct2d.pcolormesh('u','xz',1,time=100)
+        struct1d.plot_line('u', 'y')
 
     with pytest.raises(ValueError):
-        struct1d.pcolormesh('u','xz',time=100)
+        struct2d.pcolormesh('u', 'xz')
+
+    with pytest.warns(UserWarning):
+        struct1d.plot_line('u', 'x', time=100)
+
+    with pytest.warns(UserWarning):
+        struct1d.plot_line('u', loc=2, time=100)
+
+    with pytest.warns(UserWarning):
+        struct2d.pcolormesh('u', 'xz', 1, time=100)
+
+    with pytest.raises(ValueError):
+        struct1d.pcolormesh('u', 'xz', time=100)
 
 
 @check_figures_equal()
-def test_plot_line(fig_test, fig_ref, reference_fstruct):
+def test_plot_line(fig_test, fig_ref, fstruct_with_times):
     ax = fig_test.subplots()
-    reference_fstruct.plot_line('u','y', {'x': 50, 'z': 3},
-                                time=100,
-                                ax=ax)
+    fstruct_with_times.plot_line('u', 'y', {'x': 50, 'z': 3},
+                                 time=100,
+                                 ax=ax)
 
-    # y = reference_fstruct._array[0, 0, 100, :, 50]
-    y = reference_fstruct.get(x=50, z=3, time=100, comp='u')
-    x = reference_fstruct.coords['y']
+    # y = fstruct_with_times._array[0, 0, 100, :, 50]
+    y = fstruct_with_times.get(x=50, z=3, time=100, comp='u')
+    x = fstruct_with_times.coords['y']
 
     ax1 = fig_ref.subplots()
     ax1.plot(x, y)
 
+
 @check_figures_equal()
-def test_plot_line1D(fig_test, fig_ref, reference_fstruct):
+def test_plot_line1D(fig_test, fig_ref, fstruct_with_times):
     ax = fig_test.subplots()
-    struct1d = reference_fstruct.get(x=50,z=3)
+    struct1d = fstruct_with_times.get(x=50, z=3)
 
     struct1d.plot_line('u',
-                        time=100,
-                        ax=ax)
+                       time=100,
+                       ax=ax)
 
-    # y = reference_fstruct._array[0, 0, 100, :, 50]
-    y = reference_fstruct.get(x=50, z=3, time=100, comp='u')
-    x = reference_fstruct.coords['y']
+    # y = fstruct_with_times._array[0, 0, 100, :, 50]
+    y = fstruct_with_times.get(x=50, z=3, time=100, comp='u')
+    x = fstruct_with_times.coords['y']
 
     ax1 = fig_ref.subplots()
     ax1.plot(x, y)
 
+# Create more detail but standardised tests to the quiver plots
+
 
 @check_figures_equal()
-def test_pcolormesh(fig_test, fig_ref, reference_fstruct):
+def test_pcolormesh(fig_test, fig_ref, fstruct_with_times):
     ax = fig_test.subplots()
-    reference_fstruct.pcolormesh('u','xz', 1, time=100, ax=ax)
+    fstruct_with_times.pcolormesh('u', 'xz', 1, time=100, ax=ax)
 
     ax1 = fig_ref.subplots()
-    y = reference_fstruct.coords['z']
-    x = reference_fstruct.coords['x']
-    z = reference_fstruct.get(y=1, comp='u', time=100)
-
-    ax1.pcolormesh(x, y, z.T)
-
-@check_figures_equal()
-def test_pcolormesh2D(fig_test, fig_ref, reference_fstruct):
-    ax = fig_test.subplots()
-
-    struct2d = reference_fstruct.get(y=1)
-    struct2d.pcolormesh('u','xz', time=100, ax=ax)
-
-    ax1 = fig_ref.subplots()
-    y = reference_fstruct.coords['z']
-    x = reference_fstruct.coords['x']
-    z = reference_fstruct.get(y=1, comp='u', time=100)
+    y = fstruct_with_times.coords['z']
+    x = fstruct_with_times.coords['x']
+    z = fstruct_with_times.get(y=1, comp='u', time=100)
 
     ax1.pcolormesh(x, y, z.T)
 
 
 @check_figures_equal()
-def test_contour(fig_test, fig_ref, reference_fstruct):
+def test_pcolormesh2D(fig_test, fig_ref, fstruct_with_times):
     ax = fig_test.subplots()
-    reference_fstruct.contour('u', 'xz', 1, time=100, ax=ax)
+
+    struct2d = fstruct_with_times.get(y=1)
+    struct2d.pcolormesh('u', 'xz', time=100, ax=ax)
 
     ax1 = fig_ref.subplots()
-    y = reference_fstruct.coords['z']
-    x = reference_fstruct.coords['x']
-    z = reference_fstruct.get(y=1, comp='u', time=100)
+    y = fstruct_with_times.coords['z']
+    x = fstruct_with_times.coords['x']
+    z = fstruct_with_times.get(y=1, comp='u', time=100)
+
+    ax1.pcolormesh(x, y, z.T)
+
+
+@check_figures_equal()
+def test_contour(fig_test, fig_ref, fstruct_with_times):
+    ax = fig_test.subplots()
+    fstruct_with_times.contour('u', 'xz', 1, time=100, ax=ax)
+
+    ax1 = fig_ref.subplots()
+    y = fstruct_with_times.coords['z']
+    x = fstruct_with_times.coords['x']
+    z = fstruct_with_times.get(y=1, comp='u', time=100)
 
     ax1.contour(x, y, z.T)
 
+
 @check_figures_equal()
-def test_contour2D(fig_test, fig_ref, reference_fstruct):
+def test_contour2D(fig_test, fig_ref, fstruct_with_times):
     ax = fig_test.subplots()
-    
-    struct2d = reference_fstruct.get(y=1)
-    struct2d.contour('u','xz', time=100, ax=ax)
+
+    struct2d = fstruct_with_times.get(y=1)
+    struct2d.contour('u', 'xz', time=100, ax=ax)
 
     ax1 = fig_ref.subplots()
-    y = reference_fstruct.coords['z']
-    x = reference_fstruct.coords['x']
-    z = reference_fstruct.get(y=1, comp='u', time=100)
+    y = fstruct_with_times.coords['z']
+    x = fstruct_with_times.coords['x']
+    z = fstruct_with_times.get(y=1, comp='u', time=100)
 
     ax1.contour(x, y, z.T)
 
 
 @check_figures_equal()
-def test_contourf(fig_test, fig_ref, reference_fstruct):
+def test_quiver(fig_test, fig_ref, fstruct_with_times):
     ax = fig_test.subplots()
-    reference_fstruct.contourf('u', 'xz', 1, time=100, ax=ax)
+    fstruct_with_times.quiver(['u', 'v'], 'xy', 1, time=100, ax=ax,
+                              scale=None,
+                              scale_units=None)
 
     ax1 = fig_ref.subplots()
-    y = reference_fstruct.coords['z']
-    x = reference_fstruct.coords['x']
-    z = reference_fstruct.get(y=1, comp='u', time=100)
+    y = fstruct_with_times.coords['y']
+    x = fstruct_with_times.coords['x']
 
-    ax1.contourf(x, y, z.T)
+    u = fstruct_with_times.get(z=1, comp='u', time=100)
+    v = fstruct_with_times.get(z=1, comp='v', time=100)
+
+    ax1.quiver(x, y, u.T, v.T)
+
 
 @check_figures_equal()
-def test_contourf2D(fig_test, fig_ref, reference_fstruct):
+def test_quiver2D(fig_test, fig_ref, fstruct_with_times):
     ax = fig_test.subplots()
-    
-    struct2d = reference_fstruct.get(y=1)
-    struct2d.contourf('u','xz', time=100, ax=ax)
+
+    struct2d = fstruct_with_times.get(z=1)
+    struct2d.quiver(['u', 'v'], 'xy', time=100, ax=ax,
+                    scale=None,
+                    scale_units=None)
 
     ax1 = fig_ref.subplots()
-    y = reference_fstruct.coords['z']
-    x = reference_fstruct.coords['x']
-    z = reference_fstruct.get(y=1, comp='u', time=100)
+    y = struct2d.coords['y']
+    x = struct2d.coords['x']
+
+    u = struct2d.get(comp='u', time=100)
+    v = struct2d.get(comp='v', time=100)
+
+    ax1.quiver(x, y, u.T, v.T)
+
+
+@check_figures_equal()
+def test_contourf(fig_test, fig_ref, fstruct_with_times):
+    ax = fig_test.subplots()
+    fstruct_with_times.contourf('u', 'xz', 1, time=100, ax=ax)
+
+    ax1 = fig_ref.subplots()
+    y = fstruct_with_times.coords['z']
+    x = fstruct_with_times.coords['x']
+    z = fstruct_with_times.get(y=1, comp='u', time=100)
 
     ax1.contourf(x, y, z.T)
 
 
-def test_first_derivative(reference_fstruct):
+@check_figures_equal()
+def test_contourf2D(fig_test, fig_ref, fstruct_with_times):
+    ax = fig_test.subplots()
 
-    data = reference_fstruct.first_derivative('u', 'x')
+    struct2d = fstruct_with_times.get(y=1)
+    struct2d.contourf('u', 'xz', time=100, ax=ax)
+
+    ax1 = fig_ref.subplots()
+    y = fstruct_with_times.coords['z']
+    x = fstruct_with_times.coords['x']
+    z = fstruct_with_times.get(y=1, comp='u', time=100)
+
+    ax1.contourf(x, y, z.T)
+
+
+def test_first_derivative(fstruct_with_times):
+
+    data = fstruct_with_times.first_derivative('u', 'x')
     assert data.shape == (3, 200, 50, 100)
 
-    data = reference_fstruct.first_derivative('u', 'x', time=100)
+    data = fstruct_with_times.first_derivative('u', 'x', time=100)
     assert data.shape == (200, 50, 100)
 
 
-def test_second_derivative(reference_fstruct):
+def test_second_derivative(fstruct_with_times):
 
-    data = reference_fstruct.second_derivative('u', 'x')
+    data = fstruct_with_times.second_derivative('u', 'x')
     assert data.shape == (3, 200, 50, 100)
 
-    data = reference_fstruct.second_derivative('u', 'x', time=100)
+    data = fstruct_with_times.second_derivative('u', 'x', time=100)
     assert data.shape == (200, 50, 100)
 
 
-def test_to_vtk(reference_fstruct):
-    reference_fstruct.to_vtk(time=100)
+def test_to_vtk(fstruct_with_times):
+    fstruct_with_times.to_vtk(time=100)
 
 
-def test_window_uniform(reference_fstruct):
+def test_window_uniform(fstruct_with_times):
 
-    window_ref = reference_fstruct.window('uniform',101)
+    window_ref = fstruct_with_times.window('uniform', 101)
 
-    ref_array = reference_fstruct._array[:2].mean(axis=0)
-    assert np.array_equal(ref_array,window_ref._array[0])
+    ref_array = fstruct_with_times._array[:2].mean(axis=0)
+    assert np.array_equal(ref_array, window_ref._array[0])
 
-    ref_array = reference_fstruct._array.mean(axis=0)
-    assert np.array_equal(ref_array,window_ref._array[1])
+    ref_array = fstruct_with_times._array.mean(axis=0)
+    assert np.array_equal(ref_array, window_ref._array[1])
 
-    ref_array = reference_fstruct._array[1:].mean(axis=0)
-    assert np.array_equal(ref_array,window_ref._array[2])
+    ref_array = fstruct_with_times._array[1:].mean(axis=0)
+    assert np.array_equal(ref_array, window_ref._array[2])
 
     with pytest.warns(UserWarning):
-        reference_fstruct.window('uniform',50)
+        fstruct_with_times.window('uniform', 50)
 
-def test_times_to_ND(reference_fstruct):
-    timestruct = reference_fstruct.time_to_ND()
+
+def test_times_to_ND(fstruct_with_times):
+    timestruct = fstruct_with_times.time_to_ND()
 
     assert timestruct.times is None
-    assert np.array_equal(timestruct.coords['t'], reference_fstruct.times)
-    for i in range(len(reference_fstruct.times)):
-        assert np.allclose(reference_fstruct._array[i],timestruct._array[...,i],atol=0,rtol=1e-10)
+    assert np.array_equal(timestruct.coords['t'], fstruct_with_times.times)
+    for i in range(len(fstruct_with_times.times)):
+        assert np.allclose(
+            fstruct_with_times._array[i], timestruct._array[..., i], atol=0, rtol=1e-10)

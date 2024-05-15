@@ -3,9 +3,10 @@ import numpy as np
 import flowpy2 as fp2
 from .plotting import subplots, promote_axes
 import logging
-from typing import Sequence, Union, Callable, Mapping
+from typing import Sequence, Union, Callable, Mapping, Tuple
 from numbers import Number
-
+from matplotlib.axes import Axes
+from matplotlib.quiver import Quiver
 from .datastruct import DataStruct
 from .flow_type import (get_flow_type,
                         FlowType)
@@ -32,7 +33,7 @@ class CoordStruct(DataStruct):
             diff = np.diff(d)
             if not all(diff < 0) and not all(diff > 0):
                 return False
-            
+
         return True
 
     def _init_args_from_kwargs(self, **kwargs):
@@ -44,10 +45,10 @@ class CoordStruct(DataStruct):
 
     def _hdf5_write_hook(self, g: hdf5.H5_Group_File):
         g.attrs['flow_type'] = self._flow_type.name
-    
+
     @classmethod
-    def _hdf5_read_hook(cls,h5_group: hdf5.H5_Group_File):
-        return {'flow_type' : h5_group.attrs['flow_type']}
+    def _hdf5_read_hook(cls, h5_group: hdf5.H5_Group_File):
+        return {'flow_type': h5_group.attrs['flow_type']}
 
     def Translate(self, **kwargs):
         for k in kwargs:
@@ -65,6 +66,7 @@ class CoordStruct(DataStruct):
         netcdf.set_type_tag(type(self), group, "coords_tag")
 
         group.flow_type = self._flow_type.name
+        group._index = np.array([np.string_(ind) for ind in self.index])
         for key in self.index:
             data = self.get(key)
             group.createDimension(key, data.size)
@@ -84,7 +86,7 @@ class CoordStruct(DataStruct):
         real_cls = netcdf.validate_tag(cls, g, tag_check, "coords_tag")
 
         flow_type = get_flow_type(g.flow_type)
-        data = {k: g[k][:] for k in flow_type._base_keys}
+        data = {k: g[k][:] for k in g._index}
 
         return real_cls._create_struct(flow_type=flow_type.name,
                                        data=data)
@@ -101,17 +103,17 @@ class CoordStruct(DataStruct):
         return self._flow_type
 
     @flow_type.setter
-    def flow_type(self,value: Union[str,FlowType]):
+    def flow_type(self, value: Union[str, FlowType]):
         if isinstance(value, str):
             value = get_flow_type(value)
 
         if self._flow_type.has_base_keys:
             old_base_keys = self._flow_type._base_keys
-            
+
             if not all(val in value._base_keys for val in old_base_keys):
                 raise ValueError(f"{type(self).__name__} old base_keys "
                                  "must all be in the new base keys")
-        
+
         self._flow_type = value
 
     def rescale(self, key: str, val: Number):
@@ -127,9 +129,9 @@ class CoordStruct(DataStruct):
         coords = self.get(comp)
 
         coords, data = self.flow_type.process_data_line(comp,
-                                                  coords,
-                                                  data,
-                                                  kwargs)
+                                                        coords,
+                                                        data,
+                                                        kwargs)
 
         if transform_xdata is not None:
             if not callable(transform_xdata):
@@ -179,7 +181,7 @@ class CoordStruct(DataStruct):
                                                       ycoords,
                                                       data,
                                                       kwargs)
-                                                      
+
         return ax.contour(x, y, c.T, **kwargs)
 
     def contourf(self, plane: Sequence[str], data: np.ndarray, ax=None,
@@ -199,8 +201,8 @@ class CoordStruct(DataStruct):
                                                       kwargs)
         return ax.contourf(x, y, c.T, **kwargs)
 
-    def _update_axes(self,ax , fig_kw: Mapping, loc: Union[str, Sequence]):
-        
+    def _update_axes(self, ax, fig_kw: Mapping, loc: Union[str, Sequence]) -> Axes:
+
         projection = self.flow_type.projection(loc)
         if ax is None:
             if fig_kw is None:
@@ -216,7 +218,7 @@ class CoordStruct(DataStruct):
             ax = promote_axes(ax, projection=projection)
 
         return ax
-    
+
     def pcolormesh(self, plane: Sequence[str], data: np.ndarray, ax=None,
                    transform_xdata=None,
                    transform_ydata=None,
@@ -226,13 +228,50 @@ class CoordStruct(DataStruct):
 
         xcoords, ycoords = self._get_coords_contour(plane, transform_xdata,
                                                     transform_ydata)
-        
+
         x, y, c = self.flow_type.process_data_contour(plane,
                                                       xcoords,
                                                       ycoords,
                                                       data,
                                                       kwargs)
         return ax.pcolormesh(x, y, c.T, **kwargs)
+
+    def quiver(self, plane: Sequence[str],
+               U: np.ndarray,
+               V: np.ndarray,
+               spacing: Tuple[int] = (1, 1),
+               ax: Axes = None,
+               transform_xdata: Callable = None,
+               transform_ydata: Callable = None,
+               fig_kw: Mapping = None,
+               angles='uv',
+               scale_units='spacing',
+               scale=1,
+               **kwargs) -> Quiver:
+
+        ax = self._update_axes(ax, fig_kw, tuple(plane))
+
+        xcoords, ycoords = self._get_coords_contour(plane,
+                                                    transform_xdata,
+                                                    transform_ydata)
+
+        xcoords = xcoords[::spacing[0]]
+        ycoords = ycoords[::spacing[1]]
+
+        U = U[::spacing[0], ::spacing[1]]
+        V = V[::spacing[0], ::spacing[1]]
+
+        if callable(transform_xdata):
+            U = transform_xdata(U)
+
+        if callable(transform_ydata):
+            V = transform_ydata(V)
+
+        return ax.quiver(xcoords, ycoords, U.T, V.T,
+                         scale=scale,
+                         angles=angles,
+                         scale_units=scale_units,
+                         **kwargs)
 
     def coord_index(self, comp: str, loc: Union[Number, list, slice]):
         if isinstance(loc, Number):
@@ -320,7 +359,7 @@ class CoordStruct(DataStruct):
 
         return StructuredGrid(X, Y, Z)
 
-    def equals(self,other_cstruct):
+    def equals(self, other_cstruct):
 
         try:
             if self.flow_type != other_cstruct.flow_type:
@@ -329,13 +368,14 @@ class CoordStruct(DataStruct):
         except Exception:
             logger.debug("flow_type check resulted in exception")
             return False
-        
+
         return super().equals(other_cstruct)
 
-    def __str__(self)->str:
-        return "%s(%s, index=%s)"%(type(self).__name__,
-                                  self._flow_type.name,
-                                 list(self.index))
+    def __str__(self) -> str:
+        return "%s(%s, index=%s)" % (type(self).__name__,
+                                     self._flow_type.name,
+                                     list(self.index))
+
 
 @CoordStruct.implements(np.allclose)
 def allclose(dstruct1: CoordStruct, dstruct2: CoordStruct, *args, **kwargs):

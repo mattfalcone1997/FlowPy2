@@ -42,30 +42,31 @@ def test_ascending(test_data, test_index):
     data = test_data.copy()
 
     cs = CoordStruct("Cartesian",
-                    test_data,
-                    index=test_index)
+                     test_data,
+                     index=test_index)
 
     assert cs.is_consecutive
-   
+
     data[0] = test_data[0][::-1]
     cs = CoordStruct("Cartesian",
-                    data,
-                    index=test_index)
+                     data,
+                     index=test_index)
 
     assert cs.is_consecutive
 
-    n = test_data[0].size //2
+    n = test_data[0].size // 2
     d1 = np.concatenate([test_data[0][:n],
-                         test_data[0][n:][::-1]], 
+                         test_data[0][n:][::-1]],
                         axis=0)
     data[0][::2] = 2
     data[0][1::2] = -2
 
     cs = CoordStruct("Cartesian",
-                    data,
-                    index=test_index)
-    
+                     data,
+                     index=test_index)
+
     assert not cs.is_consecutive
+
 
 def test_integer_index(test_dstruct):
     ind = test_dstruct.coord_index('x', 20)
@@ -268,6 +269,24 @@ def test_contour(fig_test, fig_ref, test_dstruct):
 
     ax2 = fig_test.subplots()
     test_dstruct.contour('xy', data, ax=ax2)
+
+
+@check_figures_equal()
+def test_quiver(fig_test, fig_ref, test_dstruct: CoordStruct):
+
+    coords1 = test_dstruct['x']
+    coords2 = test_dstruct['y']
+
+    data1 = np.random.randn(coords1.size, coords2.size)
+    data2 = np.random.randn(coords1.size, coords2.size)
+
+    ax1 = fig_ref.subplots()
+    ax1.quiver(coords1, coords2, data1.T, data2.T)
+
+    ax2 = fig_test.subplots()
+    test_dstruct.quiver('xy', data1, data2, ax=ax2,
+                        scale=None,
+                        scale_units=None)
 
 
 def test_first_derivative(test_dstruct: CoordStruct):
