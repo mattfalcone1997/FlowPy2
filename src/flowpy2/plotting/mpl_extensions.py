@@ -44,7 +44,7 @@ class FlowAxes(mpl.axes.Axes):
 
         for twin in twinned:
             _kwargs = cbook.normalize_kwargs(kwargs, mlines.Line2D)
-            if mpl._version.__version__ >= '3.8':
+            if mpl.__version__ >= '3.8':
                 _lines = [*twin._get_lines(twin, *args, data=data, **_kwargs)]
             else:
                 _lines = [*twin._get_lines(*args, data=data, **_kwargs)]
