@@ -130,9 +130,10 @@ class FlowStructND(CommonArrayExtensions):
         except ValueError:
             if self._times is None:
                 raise ValueError(f"Array must be shape {shape} "
-                                 f"or {shape[1:]}") from None
+                                 f"or {shape[1:]} not {array.shape}") from None
             else:
-                raise ValueError(f"Array must be shape {shape}") from None
+                raise ValueError(f"Array must be shape {shape} "
+                                 f"not {array.shape}") from None
 
     def reduce(self, operation: Callable, axis: str):
         coords = self.coords.copy()
@@ -566,12 +567,13 @@ class FlowStructND(CommonArrayExtensions):
 
     def to_hdf(self, fn_or_obj: str, mode: str = None, key: str = None, compress=False):
 
-        g = hdf5.make_group(fn_or_obj, mode, key)
+        g = hdf5.hdfHandler(fn_or_obj, mode, key)
 
-        hdf5.set_type_tag(type(self), g)
+        g.set_type_tag(type(self))
 
-        compression = 'gzip' if compress else None
-        g.create_dataset("array", data=self._array,
+        compression = 'zlib' if compress else None
+        g.create_dataset("array",
+                         data=self._array,
                          compression=compression)
 
         self._comps.to_hdf(g, 'comps')
@@ -593,10 +595,8 @@ class FlowStructND(CommonArrayExtensions):
 
         self._hdf5_write_hook(g)
 
-        if isinstance(fn_or_obj, hdf5.H5_Group_File):
-            return g
-        else:
-            g.file.close()
+        return g
+
 
     @classmethod
     def from_hdf(cls,
@@ -606,11 +606,11 @@ class FlowStructND(CommonArrayExtensions):
                  times: Iterable[Number] = None,
                  tag_check=None) -> FlowStructND:
 
-        g = hdf5.access_group(fn_or_obj, key)
+        g = hdf5.hdfHandler(fn_or_obj, 'r', key)
         if tag_check is None:
             tag_check = fp2.rcParams['io.tag_check']
 
-        real_cls = hdf5.validate_tag(cls, g, tag_check)
+        real_cls = g.validate_tag(cls, tag_check)
 
         coords = CoordStruct.from_hdf(g, 'coords', tag_check=tag_check)
         array = g['array'][:]
@@ -636,9 +636,6 @@ class FlowStructND(CommonArrayExtensions):
 
         del attrs['array_backend']
         del attrs['type_tag']
-
-        if not isinstance(fn_or_obj, hdf5.H5_Group_File):
-            g.file.close()
 
         return real_cls._create_struct(coorddata=coords,
                                        array=array,

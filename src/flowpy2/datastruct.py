@@ -48,11 +48,12 @@ class DataStruct(CommonArrayExtensions):
 
     @classmethod
     def from_hdf(cls, fn_or_obj, key=None, tag_check=None):
-        g = hdf5.access_group(fn_or_obj, key)
+        g = hdf5.hdfHandler(fn_or_obj, key=key)
+
         if tag_check is None:
             tag_check = fp2.rcParams['io.tag_check']
 
-        real_cls = hdf5.validate_tag(cls, g, tag_check)
+        real_cls = g.validate_tag(cls, tag_check)
 
         index = CompIndexer.from_hdf(g, "index")
         d = g['data']
@@ -87,8 +88,8 @@ class DataStruct(CommonArrayExtensions):
                                         **kwargs)
 
     def to_hdf(self, fn_or_obj, mode=None, key=None):
-        g = hdf5.make_group(fn_or_obj, mode, key)
-        hdf5.set_type_tag(type(self), g)
+        g = hdf5.hdfHandler(fn_or_obj, mode, key)
+        g.set_type_tag(type(self))
 
         self._index.to_hdf(g, "index")
 
@@ -104,10 +105,7 @@ class DataStruct(CommonArrayExtensions):
 
         self._hdf5_write_hook(g)
         
-        if isinstance(fn_or_obj, hdf5.H5_Group_File):
-            return g
-        else:
-            g.file.close()
+        return g
 
     @property
     def index(self):

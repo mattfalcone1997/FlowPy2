@@ -18,105 +18,131 @@ def test_group():
 
 def test_make_group(test_filename):
 
-    g = hdf5.make_group(test_filename, 'w')
-    assert isinstance(g, h5py.File)
+    g = hdf5.hdfHandler(test_filename, 'w')
     assert g.filename == test_filename
 
-    g1 = hdf5.make_group(g)
+    g1 = hdf5.hdfHandler(g)
 
-    assert g is g1
+    g2 = hdf5.hdfHandler(g, key="group1")
 
-    g2 = hdf5.make_group(g, key="group1")
-    assert isinstance(g2, h5py.Group)
-    assert g2.name == "/group1"
+    assert g2.groupname == "group1"
 
     with pytest.raises(ValueError):
-        g2 = hdf5.make_group(g, 'w')
+        g2 = hdf5.hdfHandler(g, 'w')
 
     g.close()
 
-    g3 = hdf5.make_group(test_filename, 'a', key='group2')
+    g3 = hdf5.hdfHandler(test_filename, 'a', key='group2')
+    hdf5.hdfHandler(test_filename, 'a', key='group1/group2')
+    assert g3.filename == test_filename
 
-    assert isinstance(g3, h5py.Group)
-    assert g3.file.filename == test_filename
-
-    g3.file.close()
-
-    with pytest.raises(ValueError):
-        hdf5.make_group(test_filename)
+    g3.close()
 
     with pytest.raises(TypeError):
-        hdf5.make_group(1)
+        hdf5.hdfHandler(1)
 
 
 def test_set_type_tag(test_filename):
 
-    g = hdf5.make_group(test_filename, 'w')
+    g = hdf5.hdfHandler(test_filename, 'w')
     a = np.arange(10)
-    hdf5.set_type_tag(type(a), g)
+    g.set_type_tag(type(a))
 
     assert g.attrs['type_tag'] == "numpy.ndarray"
 
 
 def test_validate_tag(test_filename):
 
-    g = hdf5.make_group(test_filename, 'w')
-    g1 = hdf5.make_group(g, key="group1")
+    g = hdf5.hdfHandler(test_filename, 'w')
+    g1 = hdf5.hdfHandler(g, key="group1")
 
     a = np.arange(10)
-    hdf5.set_type_tag(type(a), g)
+    g.set_type_tag(type(a))
 
-    hdf5.validate_tag(type(a), g, 'strict')
-    hdf5.validate_tag(type(a), g1, 'nocheck')
+    g.validate_tag(type(a), 'strict')
+    g1.validate_tag(type(a), 'nocheck')
 
     class ndarray_subclass(np.ndarray):
         pass
 
-    hdf5.validate_tag(ndarray_subclass, g, 'weak')
+    g.validate_tag(ndarray_subclass, 'weak')
 
 
     with pytest.raises(hdf5.HDF5TagError):
-        hdf5.validate_tag(type(a), g1, 'strict')
+        g1.validate_tag(type(a), 'strict')
 
     with pytest.raises(hdf5.HDF5TagError):
-        hdf5.validate_tag(ndarray_subclass, g, 'strict')
+        g.validate_tag(ndarray_subclass, 'strict')
 
     with pytest.raises(hdf5.HDF5TagError):
-        hdf5.validate_tag(h5py.File, g1, 'strict')
+        g1.validate_tag(h5py.File, 'strict')
 
     with pytest.raises(hdf5.HDF5TagError):
-        hdf5.validate_tag(h5py.File, g1, 'strict')
+        g1.validate_tag(h5py.File, 'strict')
 
     with pytest.raises(hdf5.HDF5TagError):
-        hdf5.validate_tag(type(a), g1, 'strict')
+        g1.validate_tag(type(a), 'strict')
 
     with pytest.raises(hdf5.HDF5TagError):
-        hdf5.validate_tag(type(a), g1, 'warn')
+        g1.validate_tag(type(a), 'warn')
 
     with pytest.warns(hdf5.HDF5TagWarning):
-        hdf5.validate_tag(h5py.File, g, 'warn')
+        g.validate_tag(h5py.File, 'warn')
 
     with pytest.raises(hdf5.HDF5TagError):
-        hdf5.validate_tag(h5py.File, g, 'weak')
+        g.validate_tag(h5py.File, 'weak')
 
-    g2 = hdf5.make_group(g, key="group2")
+    g2 = hdf5.hdfHandler(g, key="group2")
     g2.attrs['type_tag'] = "numpy.nddarray"
     with pytest.raises(hdf5.HDF5TagError):
-        hdf5.validate_tag(np.ndarray, g2, 'weak')
+        g2.validate_tag(np.ndarray, 'weak')
 
     g2.attrs['type_tag'] = "numpyy.ndarray"
     with pytest.raises(hdf5.HDF5TagError):
-        hdf5.validate_tag(np.ndarray, g2, 'weak')
+        g2.validate_tag(np.ndarray, 'weak')
         
 
 def test_access_group(test_filename):
 
-    g1 = hdf5.make_group(test_filename, 'w', "group1")
+    g1 = hdf5.hdfHandler(test_filename, 'w', "group1")
+    g1.close()
 
-    hdf5.access_group(g1.file.filename)
-    hdf5.access_group(g1.file.filename, "group1")
-    g2 = hdf5.access_group(g1)
-    g3 = hdf5.access_group(g1.file, "group1")
+    hdf5.hdfHandler(g1.filename, 'r')
+    hdf5.hdfHandler(g1.filename, 'r', "group1")
 
-    assert g2 == g1
-    assert g2 == g3
+def test_getitem(test_filename):
+    g1 = hdf5.hdfHandler(test_filename, 'w', "group1/group2")
+    g1.close()
+
+    g2 =  hdf5.hdfHandler(test_filename, 'r')
+
+    assert g2['group1'].groupname == 'group1'
+
+    assert g2['group1']['group2'].groupname == 'group2'
+
+def test_dataset(test_filename):
+    g1 = hdf5.hdfHandler(test_filename, 'w', "group1/group2")
+
+    a = np.random.randn(100,200,300)
+    g1.create_dataset('data', a)
+
+    a1 = g1.read_dataset('data')
+
+    assert np.array_equal(a, a1)
+
+    g1.create_dataset('data1', a, compression='zlib')
+
+    a2 = g1.read_dataset('data1')
+
+    assert np.array_equal(a, a2)
+
+def test_dataset_str_array(test_filename):
+    g1 = hdf5.hdfHandler(test_filename, 'w', "group1/group2")
+
+    a = np.array(['a', 'bb', 'ccc', 'dddd'], dtype=np.string_)
+
+    g1.create_dataset('data', a)
+    a1 = g1.read_dataset('data')
+
+    assert (a == a1).all()
+

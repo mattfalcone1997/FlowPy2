@@ -43,11 +43,11 @@ class CoordStruct(DataStruct):
                                  self._flow_type.name)
         return kwargs
 
-    def _hdf5_write_hook(self, g: hdf5.H5_Group_File):
+    def _hdf5_write_hook(self, g: hdf5.hdfHandler):
         g.attrs['flow_type'] = self._flow_type.name
 
     @classmethod
-    def _hdf5_read_hook(cls, h5_group: hdf5.H5_Group_File):
+    def _hdf5_read_hook(cls, h5_group: hdf5.hdfHandler):
         return {'flow_type': h5_group.attrs['flow_type']}
 
     def Translate(self, **kwargs):

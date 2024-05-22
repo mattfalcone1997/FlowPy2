@@ -107,7 +107,7 @@ def test_CompIndexer_modifiers():
 
 def test_CompIndexer_to_hdf(test_filename):
     index = CompIndexer(['x', 'y', 'z'])
-    f = hdf5.make_group(test_filename, 'w')
+    f = hdf5.hdfHandler(test_filename, 'w')
 
     index.to_hdf(f, "index")
 
@@ -244,7 +244,7 @@ def test_TimeIndexer_ufunc():
 
 def test_TimeIndexer_to_hdf(test_filename):
     index = TimeIndexer(np.arange(0, 20))
-    f = hdf5.make_group(test_filename, 'w')
+    f = hdf5.hdfHandler(test_filename, 'w')
 
     index.to_hdf(f, "index")
 

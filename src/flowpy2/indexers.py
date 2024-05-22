@@ -203,16 +203,16 @@ class CompIndexer(IndexBase):
     def to_array(self):
         return np.array(self._index, dtype=np.string_)
 
-    def to_hdf(self, h5_obj: hdf5.H5_Group_File, key: str):
+    def to_hdf(self, h5_obj: hdf5.hdfHandler, key: str):
         h5_obj.create_dataset(key,
                               data=np.array(self._index,
                                             dtype=np.string_))
 
     @classmethod
-    def from_hdf(cls, h5_obj: hdf5.H5_Group_File, key: str):
+    def from_hdf(cls, h5_obj: hdf5.hdfHandler, key: str):
         return cls([key.decode('utf-8') for key in h5_obj[key]])
-    
-    def __contains__(self,val):
+
+    def __contains__(self, val):
         if isinstance(val, str):
             return val in self._index
         elif hasattr(val, '__iter__'):
@@ -372,7 +372,7 @@ class TimeIndexer(IndexBase, NDArrayOperatorsMixin):
         else:
             raise KeyError("Invalid key: must be Number, list or slice")
 
-    def find_nearest(self,times: Union[Number, List[Number], slice]):
+    def find_nearest(self, times: Union[Number, List[Number], slice]):
         self.__update_accessor_dict()
 
         if isinstance(times, Number):
@@ -380,7 +380,7 @@ class TimeIndexer(IndexBase, NDArrayOperatorsMixin):
 
         elif isinstance(times, list):
             return [self.find_nearest(t) for t in times]
-            
+
         elif isinstance(times, slice):
             if times.start is None:
                 start = None
@@ -392,7 +392,6 @@ class TimeIndexer(IndexBase, NDArrayOperatorsMixin):
             else:
                 stop = self.find_nearest(times.start)
 
-            
             if times.step is not None:
                 raise ValueError("step not allowed for slice indexing")
 
@@ -439,7 +438,8 @@ class TimeIndexer(IndexBase, NDArrayOperatorsMixin):
         indices_list = [np.array(index) for index in indices]
 
         for index in indices_list[1:]:
-            if np.equal(index, indices_list[0]).any():
+            if any(np.isclose(ind, indices_list[0], atol=0, rtol=1e-6).any()
+                    for ind in index):
                 raise ValueError("Elements overlap")
 
         combined_index = np.concatenate(indices_list)
@@ -457,7 +457,7 @@ class TimeIndexer(IndexBase, NDArrayOperatorsMixin):
 
         return out
 
-    def to_hdf(self, h5_obj: hdf5.H5_Group_File, key: str):
+    def to_hdf(self, h5_obj: hdf5.hdfHandler, key: str):
         self.__update_accessor_dict()
 
         d = h5_obj.create_dataset(key,
@@ -466,10 +466,10 @@ class TimeIndexer(IndexBase, NDArrayOperatorsMixin):
             d.attrs['decimals'] = self._decimals
 
     @classmethod
-    def from_hdf(cls, h5_obj: hdf5.H5_Group_File, key: str):
+    def from_hdf(cls, h5_obj: hdf5.hdfHandler, key: str):
         if key not in h5_obj.keys():
             return None
-        
+
         times = h5_obj[key][:]
         if 'decimals' in h5_obj.keys():
             decimals = h5_obj.attrs['decimals']
@@ -521,21 +521,21 @@ class TimeIndexer(IndexBase, NDArrayOperatorsMixin):
             return func
         return decorator
 
-    def __eq__(self,val):
+    def __eq__(self, val):
         if type(val) != type(self):
             return False
-        
+
         return np.array_equal(self._index, val._index)
 
-    def __ne__(self,val):
+    def __ne__(self, val):
         return not self.__eq__(val)
-    
-    def __contains__(self,val):
+
+    def __contains__(self, val):
         if hasattr(val, '__iter__'):
             return all(v in self._index for v in val)
         else:
             return val in self._index
-        
+
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         for x in inputs:
             # Only support operations with instances of _HANDLED_TYPES.

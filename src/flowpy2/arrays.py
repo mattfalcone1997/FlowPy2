@@ -176,10 +176,10 @@ class CommonArrayExtensions(NDArrayOperatorsMixin, ABC):
     #     pass
 
     @staticmethod
-    def _hdf5_read_hook(h5_group: hdf5.H5_Group_File):
+    def _hdf5_read_hook(hdf_obj: hdf5.hdfHandler):
         return {}
 
-    def _hdf5_write_hook(self, h5_group: hdf5.H5_Group_File):
+    def _hdf5_write_hook(self, hdf_obj: hdf5.hdfHandler):
         pass
 
     @staticmethod

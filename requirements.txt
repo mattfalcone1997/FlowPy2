@@ -9,3 +9,4 @@ pyvista
 vtk >= 9.1
 cython
 pandas
+tables
