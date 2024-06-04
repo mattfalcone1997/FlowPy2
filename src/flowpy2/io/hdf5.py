@@ -2,14 +2,14 @@ import numpy as np
 import warnings
 import logging
 from typing import Union, Literal
-
+import os
 
 from ..utils import find_stack_level
 from ._common import (valid_tag_checks,
                       make_tag,
                       weak_tag_check)
 import weakref
-import tables
+import h5py
 logger = logging.getLogger(__name__)
 
 class HDF5TagError(KeyError):
@@ -19,36 +19,53 @@ class HDF5TagError(KeyError):
 class HDF5TagWarning(UserWarning):
     pass
 
-class _hdf_attribute_dict:
-    def __init__(self, obj: tables.Node) -> None:
-        self._obj = weakref.ref(obj)
+class _hdf5_cache:
+    def __init__(self):
+        self._file_obj = dict()
 
-    def __getitem__(self, key):
-        try:
-            return self._obj()._v_attrs.__getitem__(key)
-        except KeyError:
-            raise KeyError(f"No attribute {key}") from None
-    
-    def __setitem__(self, key, value):
-        try:
-            return self._obj()._v_attrs.__setitem__(key, value)
-        except KeyError:
-            raise KeyError(f"No attribute {key}") from None
+    def _purge_keys(self):
+        keys = list(self._file_obj.keys())
+        for k in keys:
+            if not self._file_obj[k]:
+                del self._file_obj[k]
 
-    def __delitem__(self, key):
-        try:
-            return self._obj()._v_attrs.__delitem__(key)
-        except KeyError:
-            raise KeyError(f"No attribute {key}") from None
-        
-    def keys(self):
-        return self._obj()._v_attrs._f_list()
+    def get(self, filename, mode, *args, **kwargs):
+        self._purge_keys()
+        obj = self._file_obj.get(filename, None)
 
+        if obj is None:
+            h5_obj = h5py.File(filename,
+                               mode,
+                               *args,
+                               **kwargs)
+            
+            self._file_obj[filename] = h5_obj
+            owner = True
+        else:
+            if obj.mode == 'r' and mode != 'r':
+                raise ValueError("Cannot open reopen an already opened file "
+                                    f"'{filename}'in mode 'r' as"
+                                    " writeable. Close it first.")
+            if mode == 'w':
+                warnings.warn(f"A {filename} already open, but reopened "
+                              "in mode 'w'. Overwriting. ",
+                              category=UserWarning,
+                              stacklevel=find_stack_level())
+                obj.close()
+                return self.get(filename, mode, *args, **kwargs)
+            
+            h5_obj = obj
+            owner = False
+            
+        return h5_obj, owner
 class hdfHandler:
+    _file_cache = _hdf5_cache()
     def __init__(self,
-                 fn_or_obj: Union[str, bytes,tables.Group, tables.File],
+                 fn_or_obj: Union[str, bytes,h5py.Group, h5py.File],
                  mode: Literal['r', 'w', 'a', 'r+']=None,
-                 key: str= None):
+                 key: str= None, 
+                 *args,
+                 **kwargs):
         
         self.__owner = False
         msg = "Cannot use mode if str or bytes isn't passed"
@@ -56,24 +73,25 @@ class hdfHandler:
             if mode is None:
                 mode = 'r'
 
-            self._file = tables.open_file(fn_or_obj,
-                                          mode=mode)
+            self._file, self.__owner = self._file_cache.get(fn_or_obj,
+                                              mode=mode,
+                                              *args,
+                                              **kwargs)
             
-            base_group = self._file.root
-            self.__owner=True
+            base_group = self._file
 
-        elif isinstance(fn_or_obj, tables.File):
+        elif isinstance(fn_or_obj, h5py.File):
             if mode is not None:
                 raise ValueError(msg)
             
             self._file = fn_or_obj
-            base_group = self._file.root
+            base_group = self._file
 
-        elif isinstance(fn_or_obj, tables.Group):
+        elif isinstance(fn_or_obj, h5py.Group):
             if mode is not None:
                 raise ValueError(msg)
             
-            self._file = fn_or_obj._v_file
+            self._file = fn_or_obj.file
             base_group = fn_or_obj
 
         elif isinstance(fn_or_obj, hdfHandler):
@@ -89,18 +107,7 @@ class hdfHandler:
         if key is None:
             self._current_group = base_group
         else:
-           self._current_group = self._dynamic_get_group(base_group, key)
-                
-    @staticmethod
-    def _dynamic_get_group(group: tables.Group,key: str):
-        elements = key.split('/')
-        for element in elements:
-            if element in group:
-                group = group._f_get_child(element)
-            else:
-                group = tables.Group(group, element, new=True)
-
-        return group
+           self._current_group = base_group.require_group(key)
     
     def __del__(self):
         if self.__owner:
@@ -108,7 +115,7 @@ class hdfHandler:
 
     @property
     def attrs(self):
-        return _hdf_attribute_dict(self._current_group)
+        return self._current_group.attrs
     
     
     @property
@@ -116,46 +123,31 @@ class hdfHandler:
         return self._file.filename
     
     @property
-    def groupname(self):
-        return self._current_group._v_name
+    def name(self):
+        return self._current_group.name
     
     @property
-    def full_groupname(self):
-        return self._current_group._v_pathname
+    def groupname(self):
+        return os.path.basename(self.name)
     
+
     def keys(self):
-        return [x._v_name for x in self._current_group._f_list_nodes()]
+        return self._current_group.keys()
     
     def create_group(self, name: str):       
         return hdfHandler(self._current_group,
                           key = name)
     
     def __getitem__(self, key):
-        obj = getattr(self._current_group, key)
-        if isinstance(obj, tables.Group):
-            return hdfHandler(self._current_group[key])
+        obj = self._current_group[key]
+        if isinstance(obj, h5py.Group):
+            return hdfHandler(obj)
         else:
             return obj
     
-    def create_dataset(self,
-                       name: str,
-                       data: np.ndarray,
-                       compression: str=None,
-                       compress_level: int=9):
+    def create_dataset(self,*args,**kwargs):
         
-        if compression is None:
-            self._file.create_array(self._current_group,
-                                    name,
-                                    data)
-            
-        else:
-            filters=tables.Filters(complevel=compress_level,
-                                   complib=compression)
-            
-            self._file.create_carray(self._current_group,
-                                     name=name,
-                                     filters=filters,
-                                     obj=data)
+        return self._current_group.create_dataset(*args, **kwargs)
 
     def read_dataset(self,
                      name: str, 
@@ -164,7 +156,8 @@ class hdfHandler:
         if index is None:
             index = slice(None)
 
-        return getattr(self._current_group, name)[index]
+        dset = self._current_group[name]
+        return dset[index]
 
     def set_type_tag(self, cls: type):
         ref_tag = make_tag(cls)

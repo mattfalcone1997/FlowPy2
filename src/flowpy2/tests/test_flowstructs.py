@@ -759,6 +759,21 @@ def test_second_derivative(fstruct_with_times):
     data = fstruct_with_times.second_derivative('u', 'x', time=100)
     assert data.shape == (200, 50, 100)
 
+def test_integrate(fstruct_with_times):
+    data = fstruct_with_times.integrate('u', 'x')
+    assert data.shape == (3, 50, 100)
+
+    data = fstruct_with_times.integrate('u', 'x', time=100)
+    assert data.shape == (50, 100)
+
+def test_cumulative_integrate(fstruct_with_times):
+    data = fstruct_with_times.cumulative_integrate('u', 'x')
+    assert data.shape == (3, 200, 50, 100)
+
+    data = fstruct_with_times.cumulative_integrate('u', 'x', time=100)
+    assert data.shape == (200, 50, 100)
+
+
 
 def test_to_vtk(fstruct_with_times):
     fstruct_with_times.to_vtk(time=100)

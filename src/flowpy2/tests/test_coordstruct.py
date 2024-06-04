@@ -308,6 +308,24 @@ def test_second_derivative(test_dstruct: CoordStruct):
 
     test_dstruct.second_derivative('x', array1, axis=1)
 
+def test_integrate(test_dstruct: CoordStruct):
+    array = np.linspace(0, 100, 100)
+
+    test_dstruct.integrate('x', array)
+
+    array1 = np.random.randn(10, 100, 20)
+
+    test_dstruct.integrate('x', array1, axis=1)
+
+def test_cumulative_integrate(test_dstruct: CoordStruct):
+    array = np.linspace(0, 100, 100)
+
+    test_dstruct.cumulative_integrate('x', array)
+
+    array1 = np.random.randn(10, 100, 20)
+
+    test_dstruct.cumulative_integrate('x', array1, axis=1)
+
 
 def test_to_vtk(test_dstruct: CoordStruct):
     test_dstruct.to_vtk()

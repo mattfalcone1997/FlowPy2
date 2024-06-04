@@ -12,6 +12,9 @@ from .gradient import (first_derivative,
                        set_default_gradient,
                        register_gradient,
                        return_gradients)
+
+from .integrate import (register_cumulat_integration,
+                        register_integration)
 from .arrays import HAVE_CUPY
 from .io import HAVE_NETCDF4
 
@@ -30,6 +33,11 @@ def _get_validators():
     from .arrays import _rc_validators
     for k, v in _rc_validators.items():
         validators[f'arrays.{k}'] = v
+
+    from .integrate import _rc_validators
+    for k, v in _rc_validators.items():
+        validators[f'integrate.{k}'] = v
+
     return validators
 
 def _get_rc_defaults(rcparams: RcParams):
@@ -44,6 +52,10 @@ def _get_rc_defaults(rcparams: RcParams):
     from .arrays import _rc_params
     for k, v in _rc_params.items():
         rcparams[f'arrays.{k}'] = v
+
+    from .integrate import _rc_params
+    for k, v in _rc_params.items():
+        rcparams[f'integrate.{k}'] = v
 
 
 rcParams = RcParams()

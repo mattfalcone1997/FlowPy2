@@ -30,13 +30,10 @@ def test_make_group(test_filename):
     with pytest.raises(ValueError):
         g2 = hdf5.hdfHandler(g, 'w')
 
-    g.close()
-
     g3 = hdf5.hdfHandler(test_filename, 'a', key='group2')
     hdf5.hdfHandler(test_filename, 'a', key='group1/group2')
-    assert g3.filename == test_filename
 
-    g3.close()
+    assert g3.filename == test_filename
 
     with pytest.raises(TypeError):
         hdf5.hdfHandler(1)
@@ -105,14 +102,12 @@ def test_validate_tag(test_filename):
 def test_access_group(test_filename):
 
     g1 = hdf5.hdfHandler(test_filename, 'w', "group1")
-    g1.close()
 
     hdf5.hdfHandler(g1.filename, 'r')
     hdf5.hdfHandler(g1.filename, 'r', "group1")
 
 def test_getitem(test_filename):
     g1 = hdf5.hdfHandler(test_filename, 'w', "group1/group2")
-    g1.close()
 
     g2 =  hdf5.hdfHandler(test_filename, 'r')
 
@@ -124,13 +119,14 @@ def test_dataset(test_filename):
     g1 = hdf5.hdfHandler(test_filename, 'w', "group1/group2")
 
     a = np.random.randn(100,200,300)
-    g1.create_dataset('data', a)
+    g1.create_dataset('data',
+                      data=a)
 
     a1 = g1.read_dataset('data')
 
     assert np.array_equal(a, a1)
 
-    g1.create_dataset('data1', a, compression='zlib')
+    g1.create_dataset('data1', data=a, compression='gzip')
 
     a2 = g1.read_dataset('data1')
 
@@ -141,7 +137,7 @@ def test_dataset_str_array(test_filename):
 
     a = np.array(['a', 'bb', 'ccc', 'dddd'], dtype=np.string_)
 
-    g1.create_dataset('data', a)
+    g1.create_dataset('data', data=a)
     a1 = g1.read_dataset('data')
 
     assert (a == a1).all()

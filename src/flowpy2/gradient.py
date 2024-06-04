@@ -91,10 +91,13 @@ def _prepare_parallel(array, axis):
     else:
         arr = np.moveaxis(array, axis, -1)
         s = np.prod(arr.shape[:-1])
-        return arr.reshape((s, arr.shape[-1]))
+        return np.ascontiguousarray(arr.reshape((s, arr.shape[-1])))
 
 
 def _prepare_return(gradient, array_org, axis):
+    if array_org.flags['F_CONTIGUOUS']:
+        gradient = np.asfortranarray(gradient)
+
     if array_org.ndim == 1:
         return gradient.squeeze()
     else:

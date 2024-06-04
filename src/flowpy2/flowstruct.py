@@ -102,7 +102,7 @@ class FlowStructND(CommonArrayExtensions):
         if type(array).__module__ != creator.__module__:
             array = creator(array, dtype=dtype)
 
-        array = array.astype(dtype, copy=copy)
+        array = array.astype(dtype, copy=copy, order='C')
 
         for i, d in enumerate(self._data_layout[::-1], 1):
             coordsize = self._coords[d].size
@@ -1055,6 +1055,39 @@ class FlowStructND(CommonArrayExtensions):
         data = self.get(time=time, comp=comp, squeeze=False, output_fs=False)
 
         return self.coords.second_derivative(axis, data, axis_index, method=method).squeeze()
+
+    def integrate(self,
+                comp: str,
+                axis: str,
+                time: float = None,
+                method: str = None) -> ArrayLike:
+
+        axis_index = self._data_layout.index(axis) + 2
+        data = self.get(time=time,
+                        comp=comp,
+                        squeeze=False,
+                        output_fs=False)
+
+        return self.coords.integrate(axis,
+                                     data,
+                                     axis=axis_index,
+                                     method=method).squeeze()
+        
+    def cumulative_integrate(self,
+                            comp: str,
+                            axis: str,
+                            initial: Number = 0,
+                            time: float = None,
+                            method: str = None) -> ArrayLike:
+
+        axis_index = self._data_layout.index(axis) + 2
+        data = self.get(time=time, comp=comp, squeeze=False, output_fs=False)
+
+        return self.coords.cumulative_integrate(axis,
+                                                data,
+                                                axis=axis_index,
+                                                initial=initial,
+                                                method=method).squeeze()
 
     def to_vtk(self, time=None, comps=None):
 

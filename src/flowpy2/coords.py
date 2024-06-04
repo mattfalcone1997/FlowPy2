@@ -10,8 +10,13 @@ from matplotlib.quiver import Quiver
 from .datastruct import DataStruct
 from .flow_type import (get_flow_type,
                         FlowType)
+
 from .gradient import (first_derivative,
                        second_derivative)
+
+from .integrate import (integrate,
+                        cumulative_integrate)
+
 from .indexers import CompIndexer
 from .plotting import subplots
 
@@ -331,10 +336,16 @@ class CoordStruct(DataStruct):
         return second_derivative(data, coords, axis=axis, method=method)
 
     def integrate(self, comp, data, axis=0, method=None):
-        pass
+        coords = self.get(comp)
 
-    def cumulative_integrate(self, comp, data, axis=0, method=None):
-        pass
+        return integrate(data, x=coords, axis=axis, method=method)
+
+
+    def cumulative_integrate(self, comp, data,initial=0, axis=0, method=None):
+        coords = self.get(comp)
+
+        return cumulative_integrate(data,x=coords, axis=axis, method=method, initial=initial)
+
 
     def interpolate(self, other_cstruct, data):
         pass
