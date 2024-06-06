@@ -353,17 +353,32 @@ class CoordStruct(DataStruct):
     def copy(self):
         return self.__class__(self._flow_type.name, self.to_dict(), copy=True)
 
-    def to_vtk(self, layout=None):
+    def to_vtk(self, layout=None, locations: dict=None):
         if layout is None:
             layout = self.index
 
-        args = [self.get(l) for l in layout]
-        grid = dict(zip(layout,
+        if locations is not None:
+            if any(l in layout for l in locations.keys()):
+                raise ValueError(f"Locations and {type(self)}"
+                                 " cannot overlap")
+
+        else:
+            locations = {}
+
+        if self.flow_type.has_base_keys:
+            base_keys = self.flow_type._base_keys
+        else:
+            base_keys = ('x', 'y', 'z')
+
+        args = [self.get(l) if l in layout else np.array([locations.get(l,0)])\
+                 for l in base_keys ]
+
+        grid = dict(zip(['x','y','z'],
                         np.meshgrid(*args,
                                     indexing='ij')))
 
         cart_grid = self._flow_type.transform(grid)
-
+        
         X = cart_grid['x']
         Y = cart_grid['y']
         Z = cart_grid['z']

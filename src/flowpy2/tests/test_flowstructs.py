@@ -330,13 +330,31 @@ def test_slice(fstruct_with_times):
     with pytest.raises(ValueError):
         f = fstruct_with_times.slice[-0.5:]
 
+@loop_fstructs
+def test_reduce(fstruct, time, request):
 
-def test_reduce(fstruct_with_times):
-    sum_op = fstruct_with_times.reduce(np.sum, axis='z')
-    sum_array = fstruct_with_times._array.sum(axis=-1)
-    assert sum_op.comps == fstruct_with_times.comps
-    assert np.array_equal(sum_op.times, fstruct_with_times.times)
+    fstruct = request.getfixturevalue(fstruct)
+
+    sum_op = fstruct.reduce(np.sum, axis='z')
+    sum_array = fstruct._array.sum(axis=-1)
+    
+    assert sum_op.comps == fstruct.comps
+    assert np.array_equal(sum_op.times, fstruct.times)
     assert np.array_equal(sum_array, sum_op._array)
+
+    sum_op1 = fstruct.reduce(np.sum, axis=('x','z'))
+    sum_op2 = fstruct.reduce(np.sum, axis=('z','x'))
+
+    sum_array = fstruct._array.sum(axis=(-3,-1))
+
+    assert sum_op1.comps == fstruct.comps
+    assert np.array_equal(sum_op1.times, fstruct.times)
+    assert np.array_equal(sum_array, sum_op1._array)
+
+
+    assert sum_op2.comps == fstruct.comps
+    assert np.array_equal(sum_op2.times, fstruct.times)
+    assert np.array_equal(sum_array, sum_op2._array)
 
 
 def test_ufuncs(fstruct_with_times):
@@ -524,12 +542,14 @@ def test_concat(fstruct_with_times):
     with pytest.raises(ValueError):
         f1.concat(f2)
 
+@loop_fstructs
+def test_copy(fstruct, time, request):
+    fstruct = request.getfixturevalue(fstruct)
 
-def test_copy(fstruct_with_times):
-    f = fstruct_with_times.copy()
+    f = fstruct.copy()
 
     assert not np.shares_memory(f._array,
-                                fstruct_with_times._array), \
+                                fstruct._array), \
         "Ensure this one is a view"
 
 
@@ -774,9 +794,12 @@ def test_cumulative_integrate(fstruct_with_times):
     assert data.shape == (200, 50, 100)
 
 
+@loop_fstructs
+def test_to_vtk(fstruct, time, request):
+    fstruct = request.getfixturevalue(fstruct)
 
-def test_to_vtk(fstruct_with_times):
-    fstruct_with_times.to_vtk(time=100)
+    fstruct.to_vtk(time=time)
+    fstruct.slice[25].to_vtk(time=time)
 
 
 def test_window_uniform(fstruct_with_times):

@@ -57,6 +57,8 @@ class FlowStructND(CommonArrayExtensions):
             dtype = array.dtype.type
 
         self.attrs = dict(attrs)
+
+        # MOVE LOCATION TO CoordStruct and improve get method
         if location is None:
             location = {}
 
@@ -137,15 +139,24 @@ class FlowStructND(CommonArrayExtensions):
                 raise ValueError(f"Array must be shape {shape} "
                                  f"not {array.shape}") from None
 
-    def reduce(self, operation: Callable, axis: str):
+    def reduce(self, operation: Callable, axis: Union[str,Iterable[str]]):
         coords = self.coords.copy()
-        coords.remove(axis)
+
+        if isinstance(axis, str):
+            axis = [axis]
+        elif hasattr(axis, '__iter__'):
+            if not all(a in coords.index for a in axis):
+                raise ValueError("Invalid axis")
+        
         data_layout = list(self._data_layout)
-        data_layout.remove(axis)
+        axis_ind = tuple(data_layout.index(a) + 2 for a in axis)
 
         for a in axis:
-            axis_ind = list(self._data_layout).index(a) + 2
-            array = operation(self._array, axis=axis_ind)
+            coords.remove(a)
+            data_layout.remove(a)
+        
+        array = operation(self._array, axis=axis_ind)
+
         kwargs = self._init_args_from_kwargs(coorddata=coords,
                                              array=array,
                                              data_layout=data_layout)
@@ -215,7 +226,7 @@ class FlowStructND(CommonArrayExtensions):
             drop_coords=True,
             **coords_kw) -> Union[ArrayLike, FlowStructND]:
 
-        # Note this routine needs a rewrite
+        # !!!Note this routine needs a rewrite
         if not coords_kw and squeeze and isinstance(comp, str):
 
             if self._times is None or len(self._times) == 1:
@@ -552,15 +563,9 @@ class FlowStructND(CommonArrayExtensions):
                              "times to be concatenated")
 
     def copy(self) -> FlowStructND:
-        return self.__class__(self._coords,
-                              self._array,
-                              self._comps,
-                              self._data_layout,
-                              self._times,
-                              self._times.decimals,
-                              self._array_backend,
-                              copy=True)
-
+        kwargs = self._init_args_from_kwargs(copy=True)
+        return self._create_struct(**kwargs)
+    
     def __deepcopy__(self, memo):
         return self.copy()
 
@@ -1092,7 +1097,8 @@ class FlowStructND(CommonArrayExtensions):
 
     def to_vtk(self, time=None, comps=None):
 
-        grid = self.coords.to_vtk(layout=self._data_layout)
+        grid = self.coords.to_vtk(layout=self._data_layout,
+                                  locations=self._location)
         if not (self.times is None or len(self.times) == 1) and time is None:
             raise ValueError("There are multiple times, time must be present")
 
