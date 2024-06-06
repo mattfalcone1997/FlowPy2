@@ -87,8 +87,10 @@ class FlowStructND(CommonArrayExtensions):
 
         coorddata = coorddata.copy()
         if not coorddata.is_consecutive:
-            raise ValueError("CoordStruct must be consecutive is used "
-                             f"in {type(self).__name__}")
+            warnings.warn("CoordStruct is not consecutive, this may cause issues "
+                          f"with certain routines in {type(self).__name__}",
+                          category=UserWarning,
+                          stacklevel=find_stack_level())
 
         for k in coorddata.index:
             if k not in data_layout:
@@ -597,7 +599,6 @@ class FlowStructND(CommonArrayExtensions):
 
         return g
 
-
     @classmethod
     def from_hdf(cls,
                  fn_or_obj: str,
@@ -615,7 +616,7 @@ class FlowStructND(CommonArrayExtensions):
         coords = CoordStruct.from_hdf(g, 'coords', tag_check=tag_check)
         array = g['array'][:]
         comps = CompIndexer.from_hdf(g, 'comps')
-        
+
         times = TimeIndexer.from_hdf(g, 'times')
         decimals = times.decimals if times is not None else None
 
@@ -1057,10 +1058,10 @@ class FlowStructND(CommonArrayExtensions):
         return self.coords.second_derivative(axis, data, axis_index, method=method).squeeze()
 
     def integrate(self,
-                comp: str,
-                axis: str,
-                time: float = None,
-                method: str = None) -> ArrayLike:
+                  comp: str,
+                  axis: str,
+                  time: float = None,
+                  method: str = None) -> ArrayLike:
 
         axis_index = self._data_layout.index(axis) + 2
         data = self.get(time=time,
@@ -1072,13 +1073,13 @@ class FlowStructND(CommonArrayExtensions):
                                      data,
                                      axis=axis_index,
                                      method=method).squeeze()
-        
+
     def cumulative_integrate(self,
-                            comp: str,
-                            axis: str,
-                            initial: Number = 0,
-                            time: float = None,
-                            method: str = None) -> ArrayLike:
+                             comp: str,
+                             axis: str,
+                             initial: Number = 0,
+                             time: float = None,
+                             method: str = None) -> ArrayLike:
 
         axis_index = self._data_layout.index(axis) + 2
         data = self.get(time=time, comp=comp, squeeze=False, output_fs=False)
