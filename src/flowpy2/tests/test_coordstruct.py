@@ -180,6 +180,15 @@ def test_slice(test_dstruct):
     with pytest.raises(NotImplementedError):
         test_dstruct.coord_index('x', slicer5)
 
+def test_create_subdomain(test_dstruct: CoordStruct):
+    subd = test_dstruct.create_subdomain(x=50)
+
+    index = test_dstruct.coord_index('x',50)
+    val_ref = test_dstruct['x'][index]
+
+    assert val_ref == subd.location['x']
+    assert np.array_equal(subd['y'], test_dstruct['y'])
+    assert np.array_equal(subd['z'], test_dstruct['z'])
 
 def test_copy(test_dstruct):
     copy_test = test_dstruct.copy()
@@ -188,6 +197,8 @@ def test_copy(test_dstruct):
     assert copy_test._data is not test_dstruct._data, "Check it has actually copied"
     for d1, d2 in zip(test_dstruct._data, copy_test._data):
         assert np.array_equal(d1, d2)
+
+    assert copy_test.equals(test_dstruct)
 
 
 def test_hdf(test_dstruct, test_filename):

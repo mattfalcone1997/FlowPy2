@@ -35,7 +35,6 @@ class FlowStructND(CommonArrayExtensions):
                  array_backend: str = None,
                  dtype: Union[str, type, None] = None,
                  attrs: Mapping = None,
-                 location: Mapping = None,
                  copy=False,
                  **kwargs) -> None:
 
@@ -57,17 +56,6 @@ class FlowStructND(CommonArrayExtensions):
             dtype = array.dtype.type
 
         self.attrs = dict(attrs)
-
-        # MOVE LOCATION TO CoordStruct and improve get method
-        if location is None:
-            location = {}
-
-        for loc in location:
-            if loc in self._data_layout:
-                raise ValueError("Location cannot be "
-                                 f"data layout: {loc}")
-
-        self._location = location
 
         if array_backend is None:
             array_backend = fp2.rcParams['arrays.backend']
@@ -167,10 +155,6 @@ class FlowStructND(CommonArrayExtensions):
         return self._coords.flow_type
 
     @property
-    def location(self) -> Number:
-        return self._location
-
-    @property
     def dtype(self) -> type:
         return self._array.dtype.type
 
@@ -226,16 +210,16 @@ class FlowStructND(CommonArrayExtensions):
             drop_coords=True,
             **coords_kw) -> Union[ArrayLike, FlowStructND]:
 
-        # !!!Note this routine needs a rewrite
         if not coords_kw and squeeze and isinstance(comp, str):
 
             if self._times is None or len(self._times) == 1:
                 return self._fast_get_single_time(comp)
+            
             elif isinstance(time, (Number, str)):
                 return self._fast_get_many_time(time, comp)
 
         indexer = [slice(None)]*self._array.ndim
-        shape = [None]*self._array.ndim
+        shape = [1,None]
 
         indexer[1], shape[1], out_fsc = self._process_comp_index(comp)
 
@@ -245,34 +229,22 @@ class FlowStructND(CommonArrayExtensions):
             out_fst = out_fsc
 
         out_fs = out_fsc or out_fst
-        location = {}
 
         if coords_kw:
-            coord_dict = {}
+            coords, c_indexer = self.coords.create_subdomain(drop_coords=drop_coords,
+                                                             return_indexer=True,
+                                                             **coords_kw)
             data_layout = []
             for i, d in enumerate(self._data_layout):
-                indexer[2+i], shape[2+i] = self._process_coord_index(d,
-                                                                     coords_kw)
-                if isinstance(indexer[2+i], (slice, list)) or not drop_coords:
-                    coord_dict[d] = self._coords[d][indexer[2+i]]
+                indexer[2+i] = c_indexer[d]
+                if d in coords.index:
+                    shape.append(coords.get(d).size)
                     data_layout.append(d)
 
-            if drop_coords:
-                drop_shapes = [2+i for i in range(len(indexer)-2)
-                               if isinstance(indexer[i+2], np.integer)]
-
-                for i, d in enumerate(drop_shapes[::-1]):
-                    del shape[d]
-                    l = self._data_layout[d-2]
-                    location[l] = self.coords[l][indexer[d]]
-
         else:
-            coord_dict = self.coords.to_dict()
+            coords = self.coords.copy()
             data_layout = self._data_layout
-            shape[2:] = self.shape
-
-        if self._times is None:
-            shape = shape[1:]
+            shape.extend(self.shape)
 
         array = self._array[tuple(indexer)].reshape(shape)
 
@@ -283,17 +255,11 @@ class FlowStructND(CommonArrayExtensions):
                 times = None
 
             comps = self._comps[indexer[1]]
-            coords = self._coords.__class__(self.flow_type.name,
-                                            coord_dict)
-
-            location_fs = location
-            location_fs.update(self._location)
             kwargs = self._init_args_from_kwargs(coorddata=coords,
                                                  array=array,
                                                  times=times,
                                                  comps=comps,
-                                                 data_layout=data_layout,
-                                                 location=location_fs)
+                                                 data_layout=data_layout)
             return self._create_struct(**kwargs)
 
         else:
@@ -309,8 +275,8 @@ class FlowStructND(CommonArrayExtensions):
     def _preprocess_array_ufunc(self, ufunc, method, *inputs, **kwargs):
         actual_inputs = super()._preprocess_array_ufunc(ufunc, method, *inputs, **kwargs)
         for x in actual_inputs:
-            if isinstance(x, self.__class__):
-                if isinstance(x, self.__class__):
+            if isinstance(x, type(self)):
+                if isinstance(x, type(self)):
                     self._check_fstruct_compat(x, True, True)
 
         return actual_inputs
@@ -321,16 +287,22 @@ class FlowStructND(CommonArrayExtensions):
 
     def __getitem__(self, key):
         if isinstance(key, tuple):
-            return self.get(time=key[0],
-                            comp=key[1])
-        elif self._times is None:
-            return self.get(comp=key)
+            if isinstance(key[0], (Number, str)) \
+                    and isinstance(key[1], str):
+                return self._fast_get_many_time(*key)
+            else:
+                time = key[0]
+                comp = key[1]
 
-        elif len(self._times) == 1:
-            return self.get(comp=key)
+        elif isinstance(key, str):
+            if self._times is None or len(self._times) == 1:
+                return self._fast_get_single_time(key)
+            else:
+                time=None
+                comp=key
 
-        else:
-            raise KeyError("Invalid key")
+        return self.get(time=time,
+                        comp=comp)
 
     def __setitem__(self, key, value: np.ndarray):
 
@@ -400,7 +372,6 @@ class FlowStructND(CommonArrayExtensions):
         self._init_update_kwargs(kwargs, 'array_backend', self._array_backend)
         self._init_update_kwargs(kwargs, 'dtype', self.dtype)
         self._init_update_kwargs(kwargs, 'attrs', self.attrs)
-        self._init_update_kwargs(kwargs, 'location', self._location)
 
         return kwargs
 
@@ -597,9 +568,6 @@ class FlowStructND(CommonArrayExtensions):
         for k, v in self.attrs:
             g.attrs[k] = v
 
-        for k, v in self._location:
-            g.attrs[f'location_{k}'] = v
-
         self._hdf5_write_hook(g)
 
         return g
@@ -631,14 +599,7 @@ class FlowStructND(CommonArrayExtensions):
                             for key in g['data_layout'][:]])
         array_backend = attrs['array_backend']
 
-        location_keys = [k.removeprefix('location_')
-                         for k in attrs if 'location_' in k]
-        location = {k: attrs[f'location_{k}'] for k in location_keys}
-
         kwargs = real_cls._hdf5_read_hook(g)
-
-        for k in location_keys:
-            del attrs[f'location_{k}']
 
         del attrs['array_backend']
         del attrs['type_tag']
@@ -651,7 +612,6 @@ class FlowStructND(CommonArrayExtensions):
                                        decimals=decimals,
                                        array_backend=array_backend,
                                        attrs=attrs,
-                                       location=location,
                                        **kwargs)
 
     def to_netcdf(self, fn_or_obj: str, mode: str = None, key: str = None, compress=True):
@@ -684,9 +644,6 @@ class FlowStructND(CommonArrayExtensions):
         g._array_backend = self._array_backend
         for k, v in self.attrs.items():
             setattr(g, f'_attr_{k}', v)
-
-        for k, v in self._location.items():
-            setattr(g, f'_location_{k}', v)
 
         netcdf.close(g)
 
@@ -723,15 +680,10 @@ class FlowStructND(CommonArrayExtensions):
             array_backend = 'numpy'
 
         attrs = {}
-        location = {}
         for k in g.__dict__.keys():
             if '_attr_' in k:
                 attr = k.removeprefix('_attr_')
                 attrs[attr] = getattr(g, k)
-
-            if '_location_' in k:
-                attr = k.removeprefix('_location_')
-                location[attr] = getattr(g, k)
 
         return cls._create_struct(coorddata=coords,
                                   array=array,
@@ -741,7 +693,6 @@ class FlowStructND(CommonArrayExtensions):
                                   decimals=decimals,
                                   array_backend=array_backend,
                                   attrs=attrs,
-                                  location=location,
                                   **kwargs)
 
     def _get_plot_data(self, dir_plane, loc, output_dim):
@@ -1097,8 +1048,7 @@ class FlowStructND(CommonArrayExtensions):
 
     def to_vtk(self, time=None, comps=None):
 
-        grid = self.coords.to_vtk(layout=self._data_layout,
-                                  locations=self._location)
+        grid = self.coords.to_vtk(layout=self._data_layout)
         if not (self.times is None or len(self.times) == 1) and time is None:
             raise ValueError("There are multiple times, time must be present")
 

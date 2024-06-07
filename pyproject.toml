@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = 'flowpy2'
 version = "0.0.1"
-requires-python = ">=3.7,<3.12"
+requires-python = ">=3.9,<3.12"
 dynamic = ["dependencies"]
 readme = "README.md"
 authors = [{name = "Matthew Falcone", email="mapfalcone@gmail.com"}]
@@ -13,3 +13,10 @@ description = "Package to process structured 3D CFD simulation data"
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
+
+[project.optional-dependencies]
+test=["pytest"]
+
+[tool.pytest.ini_options]
+addopts="-l --log-level=DEBUG --verbosity=1"
+testpaths="src/flowpy2"

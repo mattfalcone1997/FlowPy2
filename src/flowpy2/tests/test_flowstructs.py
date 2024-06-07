@@ -550,9 +550,10 @@ def test_copy(fstruct, time, request):
 
     assert not np.shares_memory(f._array,
                                 fstruct._array), \
-        "Ensure this one is a view"
+        "Ensure this one is not a view"
 
-
+    assert f.equals(fstruct)
+    
 def test_translate(fstruct_with_times):
     f = fstruct_with_times
     f.Translate(x=-50)

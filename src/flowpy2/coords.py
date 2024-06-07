@@ -25,12 +25,17 @@ logger = logging.getLogger(__name__)
 
 
 class CoordStruct(DataStruct):
-    def __init__(self, flow_type: str, *args, **kwargs):
+    def __init__(self, flow_type: str, *args, location=None,**kwargs):
 
         super().__init__(*args, **kwargs)
 
+        if location is None:
+            location = {}
+        self._location  = dict(location)
+
         self._flow_type = get_flow_type(flow_type)
         self._flow_type.validate_keys(self.index)
+        self._flow_type.validate_keys(self._location.keys())
 
     @property
     def is_consecutive(self):
@@ -41,19 +46,37 @@ class CoordStruct(DataStruct):
 
         return True
 
+    @property
+    def location(self):
+        return self._location
+    
     def _init_args_from_kwargs(self, **kwargs):
         kwargs = super()._init_args_from_kwargs(**kwargs)
         self._init_update_kwargs(kwargs,
                                  'flow_type',
                                  self._flow_type.name)
+        self._init_update_kwargs(kwargs,
+                                'location',
+                                 self._location)
+        
         return kwargs
 
     def _hdf5_write_hook(self, g: hdf5.hdfHandler):
         g.attrs['flow_type'] = self._flow_type.name
 
+        for k, v in self._location.items():
+            g.attrs[f'location_{k}'] = v
+
     @classmethod
     def _hdf5_read_hook(cls, h5_group: hdf5.hdfHandler):
-        return {'flow_type': h5_group.attrs['flow_type']}
+        location={}
+        for attr in h5_group.attrs.keys():
+            if attr.startswith('location_'):
+                key = attr.removeprefix('location_')
+                location[key] = h5_group.attrs[attr]
+
+        return {'flow_type': h5_group.attrs['flow_type'],
+                'location': location}
 
     def Translate(self, **kwargs):
         for k in kwargs:
@@ -71,6 +94,9 @@ class CoordStruct(DataStruct):
         netcdf.set_type_tag(type(self), group, "coords_tag")
 
         group.flow_type = self._flow_type.name
+        for k, v in self._location.items():
+            setattr(group, f'_location_{k}', v)
+
         group._index = np.array([np.string_(ind) for ind in self.index])
         for key in self.index:
             data = self.get(key)
@@ -92,6 +118,12 @@ class CoordStruct(DataStruct):
 
         flow_type = get_flow_type(g.flow_type)
         data = {k: g[k][:] for k in g._index}
+
+        location = {}
+        for k in g.__dict__.keys():
+            if '_location_' in k:
+                attr = k.removeprefix('_location_')
+                location[attr] = getattr(g, k)
 
         return real_cls._create_struct(flow_type=flow_type.name,
                                        data=data)
@@ -121,6 +153,41 @@ class CoordStruct(DataStruct):
 
         self._flow_type = value
 
+    def create_subdomain(self,
+                         drop_coords=True,
+                         return_indexer=False,**coord_kw):
+        
+        coord_dict = {}
+        location = self._location.copy()
+        indexer = {}
+
+        for k in self.index:
+            if k in coord_kw:
+                index = self.coord_index(k, coord_kw[k])
+            else:
+                index = slice(None)
+
+            val = self.get(k)[index]
+            if isinstance(val, Number):
+                if drop_coords:
+                    location[k] = val
+                else:
+                    coord_dict[k] = np.array([val])
+
+            else:
+                coord_dict[k] = val
+
+            indexer[k] = index
+
+        kwargs = self._init_args_from_kwargs(data=coord_dict,
+                                             location=location)
+        coords = self._create_struct(**kwargs)
+
+        if return_indexer:
+            return coords, indexer
+        else:
+            return coords
+        
     def rescale(self, key: str, val: Number):
         index = self.index.get(key)
         self._data[index] /= val
@@ -351,27 +418,26 @@ class CoordStruct(DataStruct):
         pass
 
     def copy(self):
-        return self.__class__(self._flow_type.name, self.to_dict(), copy=True)
+        kwargs = self._init_args_from_kwargs(copy=True)
+        return self._create_struct(**kwargs)
 
-    def to_vtk(self, layout=None, locations: dict=None):
+    def to_vtk(self, layout=None):
         if layout is None:
             layout = self.index
 
-        if locations is not None:
-            if any(l in layout for l in locations.keys()):
-                raise ValueError(f"Locations and {type(self)}"
-                                 " cannot overlap")
+        if any(l in layout for l in self._location.keys()):
+            raise ValueError(f"Locations and {type(self)}"
+                                " cannot overlap")
 
-        else:
-            locations = {}
 
         if self.flow_type.has_base_keys:
             base_keys = self.flow_type._base_keys
         else:
             base_keys = ('x', 'y', 'z')
 
-        args = [self.get(l) if l in layout else np.array([locations.get(l,0)])\
-                 for l in base_keys ]
+        args = [self.get(l) if l in layout\
+                            else np.array([self._location.get(l,0)])\
+                            for l in base_keys ]
 
         grid = dict(zip(['x','y','z'],
                         np.meshgrid(*args,
@@ -379,20 +445,24 @@ class CoordStruct(DataStruct):
 
         cart_grid = self._flow_type.transform(grid)
         
-        X = cart_grid['x']
-        Y = cart_grid['y']
-        Z = cart_grid['z']
+        X = cart_grid['x'].astype('f4')
+        Y = cart_grid['y'].astype('f4')
+        Z = cart_grid['z'].astype('f4')
 
         return StructuredGrid(X, Y, Z)
 
     def equals(self, other_cstruct):
-
-        try:
-            if self.flow_type != other_cstruct.flow_type:
-                logger.debug("flow_type doesn't not match")
-                return False
-        except Exception:
-            logger.debug("flow_type check resulted in exception")
+        
+        if type(self) != type(other_cstruct):
+            logger.debug("Types do not match")
+            return False
+        
+        if self.flow_type != other_cstruct.flow_type:
+            logger.debug("flow_type doesn't match")
+            return False
+        
+        if self._location != other_cstruct._location:
+            logger.debug("location doesn't match")
             return False
 
         return super().equals(other_cstruct)

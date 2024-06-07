@@ -10,4 +10,5 @@ result_images
 benchmarks/results
 benchmarks/env
 benchmarks/FlowPy
+examples/Incompact3D example/incompact_channel
 **/*.c
