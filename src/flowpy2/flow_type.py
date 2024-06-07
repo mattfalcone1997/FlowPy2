@@ -1,5 +1,5 @@
 from __future__ import annotations
-from .io import hdf5
+
 import numpy as np
 import logging
 import copy
@@ -27,7 +27,6 @@ class FlowType:
         self._name = name
 
         self._base_keys = self._verify_keys(keys)
-            
 
         self._projection = self._validate_projection(projection)
 
@@ -41,7 +40,7 @@ class FlowType:
         self._plot_line_process = self._validate_line_data(plot_line_processor)
         self._contour_process = self._validate_line_data(contour_processor)
 
-    def _verify_keys(self,keys):
+    def _verify_keys(self, keys):
         if keys is not None:
             if not all(isinstance(key, str) for key in keys):
                 raise TypeError("All keys must be of type str")
@@ -182,7 +181,7 @@ class FlowType:
                              f"type {self.__class__.__name__}")
 
     def __eq__(self, value: object) -> bool:
-        if type(self) != type(value):
+        if type(self) is not type(value):
             logger.debug("Types do not match")
             return False
 

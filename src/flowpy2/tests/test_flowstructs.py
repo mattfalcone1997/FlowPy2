@@ -24,7 +24,10 @@ def fstruct_with_times():
     array_flat = np.arange(1, size+1, dtype='f8')
     array = array_flat.reshape(
         (len(times), len(comps), *[d.size for d in data.values()]))
-    return FlowStructND(coords, array, comps=comps, times=times, data_layout='xyz')
+    return FlowStructND(coords, array,
+                        comps=comps,
+                        times=times,
+                        data_layout='xyz')
 
 
 @pytest.fixture
@@ -41,7 +44,10 @@ def fstruct_time_None():
     array = array_flat.reshape(
         (len(comps), *[d.size for d in data.values()]))
 
-    return FlowStructND(coords, array, comps=comps, times=times, data_layout='xyz')
+    return FlowStructND(coords, array,
+                        comps=comps,
+                        times=times,
+                        data_layout='xyz')
 
 
 @pytest.fixture
@@ -330,6 +336,7 @@ def test_slice(fstruct_with_times):
     with pytest.raises(ValueError):
         f = fstruct_with_times.slice[-0.5:]
 
+
 @loop_fstructs
 def test_reduce(fstruct, time, request):
 
@@ -337,20 +344,19 @@ def test_reduce(fstruct, time, request):
 
     sum_op = fstruct.reduce(np.sum, axis='z')
     sum_array = fstruct._array.sum(axis=-1)
-    
+
     assert sum_op.comps == fstruct.comps
     assert np.array_equal(sum_op.times, fstruct.times)
     assert np.array_equal(sum_array, sum_op._array)
 
-    sum_op1 = fstruct.reduce(np.sum, axis=('x','z'))
-    sum_op2 = fstruct.reduce(np.sum, axis=('z','x'))
+    sum_op1 = fstruct.reduce(np.sum, axis=('x', 'z'))
+    sum_op2 = fstruct.reduce(np.sum, axis=('z', 'x'))
 
-    sum_array = fstruct._array.sum(axis=(-3,-1))
+    sum_array = fstruct._array.sum(axis=(-3, -1))
 
     assert sum_op1.comps == fstruct.comps
     assert np.array_equal(sum_op1.times, fstruct.times)
     assert np.array_equal(sum_array, sum_op1._array)
-
 
     assert sum_op2.comps == fstruct.comps
     assert np.array_equal(sum_op2.times, fstruct.times)
@@ -542,6 +548,7 @@ def test_concat(fstruct_with_times):
     with pytest.raises(ValueError):
         f1.concat(f2)
 
+
 @loop_fstructs
 def test_copy(fstruct, time, request):
     fstruct = request.getfixturevalue(fstruct)
@@ -553,7 +560,8 @@ def test_copy(fstruct, time, request):
         "Ensure this one is not a view"
 
     assert f.equals(fstruct)
-    
+
+
 def test_translate(fstruct_with_times):
     f = fstruct_with_times
     f.Translate(x=-50)
@@ -572,6 +580,7 @@ def test_to_hdf(fstruct, time, request):
         fstruct2 = fstruct.__class__.from_hdf(f.name)
 
     assert fstruct == fstruct2
+
 
 @loop_fstructs
 def test_to_netcdf(fstruct, time, request):
@@ -780,12 +789,14 @@ def test_second_derivative(fstruct_with_times):
     data = fstruct_with_times.second_derivative('u', 'x', time=100)
     assert data.shape == (200, 50, 100)
 
+
 def test_integrate(fstruct_with_times):
     data = fstruct_with_times.integrate('u', 'x')
     assert data.shape == (3, 50, 100)
 
     data = fstruct_with_times.integrate('u', 'x', time=100)
     assert data.shape == (50, 100)
+
 
 def test_cumulative_integrate(fstruct_with_times):
     data = fstruct_with_times.cumulative_integrate('u', 'x')
@@ -827,4 +838,5 @@ def test_times_to_ND(fstruct_with_times):
     assert np.array_equal(timestruct.coords['t'], fstruct_with_times.times)
     for i in range(len(fstruct_with_times.times)):
         assert np.allclose(
-            fstruct_with_times._array[i], timestruct._array[..., i], atol=0, rtol=1e-10)
+            fstruct_with_times._array[i], timestruct._array[..., i],
+            atol=0, rtol=1e-10)

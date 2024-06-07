@@ -104,15 +104,15 @@ def test_validate_tag(test_filename):
     with pytest.warns(netcdf.netCDF4TagWarning):
         netcdf.validate_tag(netCDF4.Dataset, g, 'warn')
 
-
     g2 = netcdf.make_dataset(g, key="group2")
-    setattr(g2, 'type_tag', "numpy.nddarray") 
+    setattr(g2, 'type_tag', "numpy.nddarray")
     with pytest.raises(netcdf.netCDF4TagError):
         netcdf.validate_tag(np.ndarray, g2, 'weak')
 
-    setattr(g2, 'type_tag', "numpyy.ndarray") 
+    setattr(g2, 'type_tag', "numpyy.ndarray")
     with pytest.raises(netcdf.netCDF4TagError):
         netcdf.validate_tag(np.ndarray, g2, 'weak')
+
 
 def test_access_group(test_filename):
 
@@ -122,5 +122,5 @@ def test_access_group(test_filename):
     netcdf.access_dataset(test_filename)
     netcdf.access_dataset(test_filename, "group1")
 
-    g2 = netcdf.access_dataset(g1)
-    g3 = netcdf.access_dataset(g1.filepath(), "group1")
+    netcdf.access_dataset(g1)
+    netcdf.access_dataset(g1.filepath(), "group1")

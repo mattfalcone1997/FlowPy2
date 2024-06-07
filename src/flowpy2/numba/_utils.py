@@ -39,10 +39,10 @@ def _log_simd(func, simd_key='subp'):
         mod = inspect.getmodulename(file)
         _log.info("%s.%s: Checking simd" % (mod, func.__name__))
         for sig in func.signatures:
-            for l in func.inspect_asm(sig).split('\n'):
-                if simd_key in l:
+            for lo in func.inspect_asm(sig).split('\n'):
+                if simd_key in lo:
                     count += 1
-                    _log.info(l)
+                    _log.info(lo)
 
         if count == 0:
             _log.info("No simd instructions found")

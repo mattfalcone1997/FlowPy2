@@ -17,21 +17,18 @@ from .gradient import (first_derivative,
 from .integrate import (integrate,
                         cumulative_integrate)
 
-from .indexers import CompIndexer
-from .plotting import subplots
-
 from pyvista import StructuredGrid
 logger = logging.getLogger(__name__)
 
 
 class CoordStruct(DataStruct):
-    def __init__(self, flow_type: str, *args, location=None,**kwargs):
+    def __init__(self, flow_type: str, *args, location=None, **kwargs):
 
         super().__init__(*args, **kwargs)
 
         if location is None:
             location = {}
-        self._location  = dict(location)
+        self._location = dict(location)
 
         self._flow_type = get_flow_type(flow_type)
         self._flow_type.validate_keys(self.index)
@@ -49,16 +46,16 @@ class CoordStruct(DataStruct):
     @property
     def location(self):
         return self._location
-    
+
     def _init_args_from_kwargs(self, **kwargs):
         kwargs = super()._init_args_from_kwargs(**kwargs)
         self._init_update_kwargs(kwargs,
                                  'flow_type',
                                  self._flow_type.name)
         self._init_update_kwargs(kwargs,
-                                'location',
+                                 'location',
                                  self._location)
-        
+
         return kwargs
 
     def _hdf5_write_hook(self, g: hdf5.hdfHandler):
@@ -69,7 +66,7 @@ class CoordStruct(DataStruct):
 
     @classmethod
     def _hdf5_read_hook(cls, h5_group: hdf5.hdfHandler):
-        location={}
+        location = {}
         for attr in h5_group.attrs.keys():
             if attr.startswith('location_'):
                 key = attr.removeprefix('location_')
@@ -155,8 +152,8 @@ class CoordStruct(DataStruct):
 
     def create_subdomain(self,
                          drop_coords=True,
-                         return_indexer=False,**coord_kw):
-        
+                         return_indexer=False, **coord_kw):
+
         coord_dict = {}
         location = self._location.copy()
         indexer = {}
@@ -187,7 +184,7 @@ class CoordStruct(DataStruct):
             return coords, indexer
         else:
             return coords
-        
+
     def rescale(self, key: str, val: Number):
         index = self.index.get(key)
         self._data[index] /= val
@@ -218,7 +215,11 @@ class CoordStruct(DataStruct):
 
         return ax
 
-    def _get_coords_contour(self, plane, transform_xdata: Callable = None, transform_ydata: Callable = None):
+    def _get_coords_contour(self,
+                            plane,
+                            transform_xdata: Callable = None,
+                            transform_ydata: Callable = None):
+
         if len(plane) != 2:
             raise ValueError("Length of plane must be 2")
 
@@ -273,7 +274,10 @@ class CoordStruct(DataStruct):
                                                       kwargs)
         return ax.contourf(x, y, c.T, **kwargs)
 
-    def _update_axes(self, ax, fig_kw: Mapping, loc: Union[str, Sequence]) -> Axes:
+    def _update_axes(self,
+                     ax,
+                     fig_kw: Mapping,
+                     loc: Union[str, Sequence]) -> Axes:
 
         projection = self.flow_type.projection(loc)
         if ax is None:
@@ -366,7 +370,7 @@ class CoordStruct(DataStruct):
 
         elif isinstance(loc, (list, tuple, np.ndarray)):
             logger.debug("Input loc is a is list, tuple or array")
-            return [self.coord_index(comp, l) for l in loc]
+            return [self.coord_index(comp, lc) for lc in loc]
 
         elif isinstance(loc, slice):
             logger.debug("Input loc is a slice")
@@ -407,12 +411,14 @@ class CoordStruct(DataStruct):
 
         return integrate(data, x=coords, axis=axis, method=method)
 
-
-    def cumulative_integrate(self, comp, data,initial=0, axis=0, method=None):
+    def cumulative_integrate(self, comp, data, initial=0, axis=0, method=None):
         coords = self.get(comp)
 
-        return cumulative_integrate(data,x=coords, axis=axis, method=method, initial=initial)
-
+        return cumulative_integrate(data,
+                                    x=coords,
+                                    axis=axis,
+                                    method=method,
+                                    initial=initial)
 
     def interpolate(self, other_cstruct, data):
         pass
@@ -425,26 +431,25 @@ class CoordStruct(DataStruct):
         if layout is None:
             layout = self.index
 
-        if any(l in layout for l in self._location.keys()):
+        if any(lo in layout for lo in self._location.keys()):
             raise ValueError(f"Locations and {type(self)}"
-                                " cannot overlap")
-
+                             " cannot overlap")
 
         if self.flow_type.has_base_keys:
             base_keys = self.flow_type._base_keys
         else:
             base_keys = ('x', 'y', 'z')
 
-        args = [self.get(l) if l in layout\
-                            else np.array([self._location.get(l,0)])\
-                            for l in base_keys ]
+        args = [self.get(lo) if lo in layout
+                else np.array([self._location.get(lo, 0)])
+                for lo in base_keys]
 
-        grid = dict(zip(['x','y','z'],
+        grid = dict(zip(['x', 'y', 'z'],
                         np.meshgrid(*args,
                                     indexing='ij')))
 
         cart_grid = self._flow_type.transform(grid)
-        
+
         X = cart_grid['x'].astype('f4')
         Y = cart_grid['y'].astype('f4')
         Z = cart_grid['z'].astype('f4')
@@ -452,17 +457,20 @@ class CoordStruct(DataStruct):
         return StructuredGrid(X, Y, Z)
 
     def equals(self, other_cstruct):
-        
-        if type(self) != type(other_cstruct):
-            logger.debug("Types do not match")
+
+        if type(self) is not type(other_cstruct):
+            logger.debug("Types do not match: "
+                         f"({type(self)}) vs ({type(other_cstruct)})")
             return False
-        
+
         if self.flow_type != other_cstruct.flow_type:
-            logger.debug("flow_type doesn't match")
+            logger.debug("flow_type doesn't match: "
+                         f"({self.flow_type}) vs ({other_cstruct.flow_type})")
             return False
-        
+
         if self._location != other_cstruct._location:
-            logger.debug("location doesn't match")
+            logger.debug("location doesn't match "
+                         f"({self._location}) vs ({other_cstruct._location})")
             return False
 
         return super().equals(other_cstruct)

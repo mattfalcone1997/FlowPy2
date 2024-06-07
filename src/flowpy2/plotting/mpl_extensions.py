@@ -7,21 +7,10 @@ for simpler high-level use in this application
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
 from typing import Iterable, Union
 from cycler import Cycler
 
-import itertools
-import warnings
-import copy
-from shutil import which
-
-import matplotlib.tri as mtri
-from scipy.interpolate import interp1d
-from ..utils import find_stack_level
-
-from matplotlib.axes._base import _process_plot_var_args
 import matplotlib.lines as mlines
 from matplotlib import cbook
 
@@ -31,13 +20,14 @@ class FlowAxes(mpl.axes.Axes):
 
     def plot(self, *args, scalex=True, scaley=True, data=None, **kwargs):
         """
-        Same as parent function accept that it also increments 
+        Same as parent function accept that it also increments
         the prop cycler on twinned axes without plotting. Probs could be
         implemented more directly bu this uses the highest level way of "
-        doing it. Note that it won't work unless the twinned axes are 
+        doing it. Note that it won't work unless the twinned axes are
         created before this plot method is invoked.
         """
-        lines = super().plot(*args, scalex=scalex, scaley=scaley, data=data, **kwargs)
+        lines = super().plot(*args, scalex=scalex, scaley=scaley, data=data,
+                             **kwargs)
 
         twinned = [twin for twin in self._twinned_axes.get_siblings(
             self) if twin != self]
@@ -45,22 +35,22 @@ class FlowAxes(mpl.axes.Axes):
         for twin in twinned:
             _kwargs = cbook.normalize_kwargs(kwargs, mlines.Line2D)
             if mpl.__version__ >= '3.8':
-                _lines = [*twin._get_lines(twin, *args, data=data, **_kwargs)]
+                [*twin._get_lines(twin, *args, data=data, **_kwargs)]
             else:
-                _lines = [*twin._get_lines(*args, data=data, **_kwargs)]
+                [*twin._get_lines(*args, data=data, **_kwargs)]
 
         return lines
 
     cplot = plot
 
-    def set_prop_cycle(self, cycler: Cycler=None):
+    def set_prop_cycle(self, cycler: Cycler = None):
         self._get_lines.set_prop_cycle(cycler)
 
     def _make_twin_axes(self, *args, **kwargs):
         if 'projection' not in kwargs:
             kwargs['projection'] = 'FlowAxes'
         return super()._make_twin_axes(*args, **kwargs)
-    
+
     def apply_func_contours(self, comp, func):
         quadmesh_list = [x for x in self.get_children()
                          if isinstance(x, mpl.collections.QuadMesh)]
@@ -100,7 +90,8 @@ class FlowAxes(mpl.axes.Axes):
             else:
                 if hasattr(val, "__iter__"):
                     if len(val) != len(line.get_xdata()):
-                        raise RuntimeError("The length of vals must be the same as the" +
+                        raise RuntimeError("The length of vals "
+                                           "must be the same as the"
                                            "number of lines in an axis")
                 norm_val = val
             xdata = 0
@@ -187,22 +178,23 @@ _default_projection = ['FlowAxes']
 def set_default_projection(projection):
     _default_projection[0] = projection
 
-def promote_axes(ax: Union[mpl.axes.Axes,Iterable[mpl.axes.Axes]],
-                 projection: str=None):
-    
-    scalar=False
+
+def promote_axes(ax: Union[mpl.axes.Axes, Iterable[mpl.axes.Axes]],
+                 projection: str = None):
+
+    scalar = False
     if isinstance(ax, mpl.axes.Axes):
         ax = [ax]
         scalar = True
 
     if projection is None:
         projection = _default_projection[0]
-        
+
     cls = mpl.projections.get_projection_class(projection)
-    
+
     for i, a in enumerate(ax):
-        
-        if isinstance(a,cls):
+
+        if isinstance(a, cls):
             continue
         elif isinstance(a, mpl.axes.Axes):
             s = a.__getstate__()
@@ -215,18 +207,19 @@ def promote_axes(ax: Union[mpl.axes.Axes,Iterable[mpl.axes.Axes]],
 
     return ax[0] if scalar else np.array(ax)
 
-        
 
 figure = plt.figure
 
 
-def subplots(nrows=1, ncols=1, sharex=False, sharey=False, squeeze=True, subplot_kw=None, gridspec_kw=None, *args, **fig_kw):
+def subplots(nrows=1, ncols=1, sharex=False, sharey=False, squeeze=True,
+             subplot_kw=None, gridspec_kw=None, *args, **fig_kw):
     fig = plt.figure(*args, **fig_kw)
     if subplot_kw is None:
         subplot_kw = {'projection': _default_projection[0]}
 
-    ax = fig.subplots(nrows, ncols, sharex=sharex, sharey=sharey, squeeze=squeeze,
-                      subplot_kw=subplot_kw, gridspec_kw=gridspec_kw)
+    ax = fig.subplots(nrows, ncols, sharex=sharex, sharey=sharey,
+                      squeeze=squeeze, subplot_kw=subplot_kw,
+                      gridspec_kw=gridspec_kw)
     return fig, ax
 
 

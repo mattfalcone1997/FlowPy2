@@ -1,15 +1,11 @@
 import numpy as np
-import logging
-import matplotlib.pyplot as plt
 
 from matplotlib.testing.decorators import check_figures_equal
 
-from flowpy2.coords import (CoordStruct,
-                            logger)
-from flowpy2.flow_type import register_flow_type
-
+from flowpy2.coords import CoordStruct
 import pytest
 from flowpy2.io import netcdf
+
 from test_hdf5 import test_filename
 
 
@@ -54,10 +50,6 @@ def test_ascending(test_data, test_index):
 
     assert cs.is_consecutive
 
-    n = test_data[0].size // 2
-    d1 = np.concatenate([test_data[0][:n],
-                         test_data[0][n:][::-1]],
-                        axis=0)
     data[0][::2] = 2
     data[0][1::2] = -2
 
@@ -180,21 +172,25 @@ def test_slice(test_dstruct):
     with pytest.raises(NotImplementedError):
         test_dstruct.coord_index('x', slicer5)
 
+
 def test_create_subdomain(test_dstruct: CoordStruct):
     subd = test_dstruct.create_subdomain(x=50)
 
-    index = test_dstruct.coord_index('x',50)
+    index = test_dstruct.coord_index('x', 50)
     val_ref = test_dstruct['x'][index]
 
     assert val_ref == subd.location['x']
     assert np.array_equal(subd['y'], test_dstruct['y'])
     assert np.array_equal(subd['z'], test_dstruct['z'])
 
+
 def test_copy(test_dstruct):
     copy_test = test_dstruct.copy()
 
     assert copy_test.flow_type is copy_test.flow_type, "Check flow type"
-    assert copy_test._data is not test_dstruct._data, "Check it has actually copied"
+    assert copy_test._data is not test_dstruct._data, \
+        "Check it has actually copied"
+
     for d1, d2 in zip(test_dstruct._data, copy_test._data):
         assert np.array_equal(d1, d2)
 
@@ -319,6 +315,7 @@ def test_second_derivative(test_dstruct: CoordStruct):
 
     test_dstruct.second_derivative('x', array1, axis=1)
 
+
 def test_integrate(test_dstruct: CoordStruct):
     array = np.linspace(0, 100, 100)
 
@@ -327,6 +324,7 @@ def test_integrate(test_dstruct: CoordStruct):
     array1 = np.random.randn(10, 100, 20)
 
     test_dstruct.integrate('x', array1, axis=1)
+
 
 def test_cumulative_integrate(test_dstruct: CoordStruct):
     array = np.linspace(0, 100, 100)

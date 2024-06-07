@@ -2,7 +2,6 @@
 import logging
 import warnings
 from ..utils import find_stack_level
-import inspect
 from ._common import (valid_tag_checks,
                       make_tag,
                       weak_tag_check)
@@ -24,12 +23,9 @@ class netCDF4TagWarning(UserWarning):
     pass
 
 
-
 def set_type_tag(cls, g, tag_attr='type_tag'):
     ref_tag = make_tag(cls)
     setattr(g, tag_attr, ref_tag)
-
-
 
 
 def validate_tag(cls, g, tag_check, tag_attr='type_tag'):
@@ -46,7 +42,7 @@ def validate_tag(cls, g, tag_check, tag_attr='type_tag'):
         tag = getattr(g, tag_attr)
     except AttributeError:
         if tag_check != 'nocheck':
-            raise netCDF4TagError(f"No tag found. Potentially "
+            raise netCDF4TagError("No tag found. Potentially "
                                   "invalid HDF5 File or Group.") from None
         else:
             logger.debug("No tag found on group.")
@@ -65,14 +61,15 @@ def validate_tag(cls, g, tag_check, tag_attr='type_tag'):
                           stacklevel=find_stack_level())
         elif tag_check == 'weak':
             cls = weak_tag_check(cls,
-                            tag,
-                            netCDF4TagError)
-            
+                                 tag,
+                                 netCDF4TagError)
+
         elif tag_check == 'nocheck':
             logger.debug("Tags do not match. You can change "
                          "tag check through keyword or rcParams")
 
     return cls
+
 
 def make_dataset(fn_or_obj, mode=None, key=None):
     if isinstance(fn_or_obj, (str, bytes)):

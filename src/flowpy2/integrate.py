@@ -10,16 +10,19 @@ if scipy.__version__ >= "1.12":
 
 logger = logging.getLogger(__name__)
 
+
 def _validate_integration(val):
     set_default_integration(val)
     return val
+
 
 def _validate_cumulat_integration(val):
     set_default_cumulat_integration(val)
     return val
 
+
 _rc_params = {'default_integrate': 'scipy_simps',
-              'default_cumulat_integrate': 'scipy_cumtrapz',}
+              'default_cumulat_integrate': 'scipy_cumtrapz', }
 _rc_validators = {'default_integrate': _validate_integration,
                   'default_cumulat_integrate': _validate_cumulat_integration}
 
@@ -36,28 +39,32 @@ def set_default_integration(name: str):
 
     _default_integration[0] = name
 
+
 def set_default_cumulat_integration(name: str):
     if name not in _cumulative_integrations:
         raise ValueError("Cumulative integrate method is invalid")
 
     _default_cumulat_integration[0] = name
 
+
 def register_integration(name: str,
                          integrate_method: Callable,
-                         force: bool=False):
+                         force: bool = False):
     if name in _integrations and not force:
         raise ValueError(f"Method {name} already registered")
 
     _integrations[name] = integrate_method
 
+
 def register_cumulat_integration(name: str,
-                                integrate_method: Callable,
-                                force: bool=False):
-    
+                                 integrate_method: Callable,
+                                 force: bool = False):
+
     if name in _cumulative_integrations and not force:
         raise ValueError(f"Method {name} already registered")
 
     _cumulative_integrations[name] = integrate_method
+
 
 def integrate(*args, method=None, **kwargs):
     if method is None:
@@ -68,6 +75,7 @@ def integrate(*args, method=None, **kwargs):
 
     return _integrations[method](*args, **kwargs)
 
+
 def cumulative_integrate(*args, method=None, **kwargs):
     if method is None:
         method = _default_cumulat_integration[0]
@@ -77,10 +85,9 @@ def cumulative_integrate(*args, method=None, **kwargs):
 
     return _cumulative_integrations[method](*args, **kwargs)
 
+
 register_integration('scipy_simps', simpson)
 register_cumulat_integration('scipy_cumtrapz', cumulative_trapezoid)
 
 if scipy.__version__ >= "1.12":
     register_cumulat_integration('scipy_cumsimps', cumulative_simpson)
-
-

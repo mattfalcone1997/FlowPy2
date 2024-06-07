@@ -123,7 +123,8 @@ def test_TimeIndexer_init():
 
     assert indexer._decimals is None, "Check default decimals"
     assert indexer._dtype == np.float64, "Check default type"
-    assert indexer._index.dtype.type == np.float64, "Check user specified decimals"
+    assert indexer._index.dtype.type == np.float64, \
+        "Check user specified decimals"
 
     data1 = data + 0.000000001
     with pytest.warns(DtypeTruncationWarning):
@@ -133,11 +134,12 @@ def test_TimeIndexer_init():
     with pytest.warns(RoundTruncationWarning):
         indexer = TimeIndexer(data1, decimals_round=1)
 
-    assert indexer._decimals is 1, "Check user specified decimals"
+    assert indexer._decimals == 1, "Check user specified decimals"
     assert np.array_equal(indexer._index, data.astype('f4'))
 
     indexer = TimeIndexer(data, dtype='f4')
-    assert indexer._index.dtype.type == np.float32, "Check user specified decimals"
+    assert indexer._index.dtype.type == np.float32, \
+        "Check user specified decimals"
 
 
 def test_TimeIndexer_get():
@@ -156,7 +158,8 @@ def test_TimeIndexer_get():
 
     indexer = TimeIndexer(data, decimals_round=4)
     assert indexer.get(0.01001) == 0, \
-        "Check get with element with default decimals with extral decimal place"
+        ("Check get with element with default"
+         " decimals with extral decimal place")
 
     assert indexer.get([0.01001, 4.01001, 5.01001]) == [0, 4, 5], \
         "Check get with list with default decimals with extral decimal place"

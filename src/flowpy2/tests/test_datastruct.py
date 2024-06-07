@@ -1,11 +1,9 @@
 import numpy as np
-import logging
-from flowpy2.datastruct import (DataStruct,
-                                logger)
+from flowpy2.datastruct import DataStruct
 # from flowpy2.arrays_old import GroupArray
-from flowpy2.indexers import CompIndexer
-from test_hdf5 import test_filename
+
 import pytest
+from test_hdf5 import test_filename
 
 
 def return_data_index():
@@ -125,7 +123,8 @@ def test_iter():
 def test_copy(test_dstruct):
     copy_test = test_dstruct.copy()
     assert copy_test == test_dstruct
-    assert copy_test._data is not test_dstruct._data, "Check it has actually copied"
+    assert copy_test._data is not test_dstruct._data, \
+        "Check it has actually copied"
     for d1, d2 in zip(test_dstruct._data, copy_test._data):
         assert d1 is not d2, "elements not the same object"
         assert np.array_equal(d1, d2), "check numeric values are the same"

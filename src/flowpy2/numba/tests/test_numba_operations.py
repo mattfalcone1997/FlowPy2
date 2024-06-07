@@ -27,14 +27,16 @@ def test_tdma_validity():
     sol = np.linspace(100, 300, n)
 
     assert np.allclose(
-        sol, out, atol=0, rtol=1e-12), "Check simple solution to heat conduction equation order 2"
+        sol, out, atol=0, rtol=1e-12), \
+        "Check simple solution to heat conduction equation order 2"
 
     large_sol = np.ones((100, n))*sol
     large_rhs = np.ones((100, n))*rhs
 
     out = op.tdma_solve(ldiag, cdiag, rdiag, large_rhs)
     assert np.allclose(
-        large_sol, out, atol=0, rtol=1e-12), "Check parallel solution to heat conduction equation order 2"
+        large_sol, out, atol=0, rtol=1e-12), \
+        "Check parallel solution to heat conduction equation order 2"
 
 
 def test_tdma_exceptions():

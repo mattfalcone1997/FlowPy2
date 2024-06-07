@@ -5,14 +5,10 @@ import copy
 import logging
 import flowpy2 as fp2
 from typing import Iterable, Union, Dict
-from numpy.lib.mixins import NDArrayOperatorsMixin
 from .arrays import CommonArrayExtensions, array_backends
 from .indexers import CompIndexer
-from abc import ABC, abstractmethod
 
-from .io import hdf5, cls_from_tag
-import warnings
-from .utils import find_stack_level
+from .io import hdf5
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +16,7 @@ logger = logging.getLogger(__name__)
 class DataStruct(CommonArrayExtensions):
     _array_attr = '_data'
     _HANDLED_TYPES = (numbers.Number, np.ndarray)
+
     def __init__(self,
                  data: Union[Iterable[np.ndarray], Dict[str, np.ndarray]],
                  index: Iterable[str] = None,
@@ -81,11 +78,11 @@ class DataStruct(CommonArrayExtensions):
         array_backend = g.attrs['array_backend']
 
         kwargs = real_cls._hdf5_read_hook(g)
-        
+
         return real_cls._create_struct(data=data,
-                                        index=index,
-                                        array_backend=array_backend,
-                                        **kwargs)
+                                       index=index,
+                                       array_backend=array_backend,
+                                       **kwargs)
 
     def to_hdf(self, fn_or_obj, mode=None, key=None):
         g = hdf5.hdfHandler(fn_or_obj, mode, key)
@@ -104,7 +101,7 @@ class DataStruct(CommonArrayExtensions):
         g.attrs['array_backend'] = self._array_backend
 
         self._hdf5_write_hook(g)
-        
+
         return g
 
     @property
@@ -128,7 +125,7 @@ class DataStruct(CommonArrayExtensions):
 
         array = [creator(arr, dtype=dtype, copy=copy) for arr in array]
 
-        self._data = np.empty(len(array),dtype=object)
+        self._data = np.empty(len(array), dtype=object)
         for i in range(self._data.size):
             self._data[i] = array[i]
 
@@ -225,7 +222,7 @@ class DataStruct(CommonArrayExtensions):
     def __contains__(self, key):
         return key in self._index
 
-    def _init_args_from_kwargs(self,**kwargs):
+    def _init_args_from_kwargs(self, **kwargs):
         self._init_update_kwargs(kwargs, 'data', self._data)
 
         self._init_update_kwargs(kwargs, 'index', self._index)
@@ -233,15 +230,17 @@ class DataStruct(CommonArrayExtensions):
         self._init_update_kwargs(kwargs, 'dtype', self._data[0].dtype.type)
 
         self._init_update_kwargs(kwargs, 'array_backend', self._array_backend)
-    
-        return kwargs 
-    
+
+        return kwargs
+
     def concat(self, datastruct):
-        if type(datastruct) != self.__class__:
+        if type(datastruct) is not self.__class__:
             raise TypeError(f"Merging {self.__class__.__name}"
                             " must be of the same type")
+
         self._index.extend(datastruct._index)
-        self._data = np.concatenate([self._data, datastruct._data], axis=0,dtype=object)
+        self._data = np.concatenate(
+            [self._data, datastruct._data], axis=0, dtype=object)
 
     def remove(self, keys):
         indexer = self._index.get_other(keys)
@@ -250,19 +249,20 @@ class DataStruct(CommonArrayExtensions):
         self._index.remove(keys)
 
     def __str__(self):
-        return "%s(index=%s)"%(type(self).__name__,
-                               list(self.index))
+        return "%s(index=%s)" % (type(self).__name__,
+                                 list(self.index))
 
     def __repr__(self):
         return self.__str__()
 
-    def _array_function_check_meta(self,fstruct: DataStruct):
+    def _array_function_check_meta(self, fstruct: DataStruct):
         try:
             self._check_fstruct_compat(fstruct, True, True)
         except ValueError:
             return False
 
         return True
+
 
 @DataStruct.implements(np.allclose)
 def allclose(dstruct1: DataStruct, dstruct2: DataStruct, *args, **kwargs):

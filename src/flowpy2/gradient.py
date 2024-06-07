@@ -9,7 +9,6 @@ from numbers import Number
 import flowpy2.numba.gradient as nbgr
 import flowpy2.cython.gradient as cygr
 
-from matplotlib.rcsetup import validate_any
 from math import ceil, floor
 logger = logging.getLogger(__name__)
 
@@ -19,12 +18,15 @@ _second_derivatives = dict()
 
 _default_method = [None]
 
+
 def _validate_gradient(val):
     set_default_gradient(val)
     return val
 
+
 _rc_params = {'default_method': 'numba2'}
 _rc_validators = {'default_method': _validate_gradient}
+
 
 def set_default_gradient(name: str):
     if name not in _first_derivatives:
@@ -50,8 +52,6 @@ def register_gradient(name: str, first_deriv: Callable,
                                *varargs, axis=axis)
 
     _second_derivatives[name] = second_deriv
-
-
 
 
 def return_gradients():
@@ -168,6 +168,7 @@ def numba_gradient2_order6(array, *varargs, axis=None):
 register_gradient('numba6', numba_gradient1_order6,
                   numba_gradient2_order6)
 
+
 def cython_gradient1_order2(array, *varargs, axis=None):
 
     if len(varargs) == 1:
@@ -198,7 +199,14 @@ def cython_gradient2_order2(array, *varargs, axis=None):
 register_gradient('cython2', cython_gradient1_order2,
                   cython_gradient2_order2)
 
-def compute_FD_stencil(derivative, rhs_stencil, lhs_stencil=None, subs=None, use_rational=True, simplify=True, method='LU'):
+
+def compute_FD_stencil(derivative, rhs_stencil,
+                       lhs_stencil=None,
+                       subs=None,
+                       use_rational=True,
+                       simplify=True,
+                       method='LU'):
+
     rhs_stencil = np.array(rhs_stencil)
     if lhs_stencil is None:
         lhs_stencil = [0]

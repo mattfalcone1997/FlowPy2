@@ -1,7 +1,6 @@
 import inspect
 import os
 import flowpy2 as fp
-# function taken from pandas
 
 
 def find_stack_level() -> int:

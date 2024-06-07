@@ -6,6 +6,7 @@ from scipy.integrate import (simpson,
 from flowpy2 import integrate
 from numbers import Number
 
+
 def test_register_integrations():
 
     integrate.register_integration('scipy_simps2', simpson)
@@ -14,8 +15,9 @@ def test_register_integrations():
 
     integrate.register_cumulat_integration('scipy_cumtrapz2',
                                            cumulative_trapezoid)
-    
+
     assert 'scipy_cumtrapz2' in integrate._cumulative_integrations
+
 
 def test_default_setter():
     integrate.set_default_integration('scipy_simps')
@@ -26,7 +28,6 @@ def test_default_setter():
     integrate.register_integration('scipy_simps3', simpson)
     integrate.set_default_integration('scipy_simps3')
 
-
     integrate.set_default_cumulat_integration('scipy_cumtrapz')
 
     with pytest.raises(ValueError):
@@ -35,6 +36,7 @@ def test_default_setter():
     integrate.register_cumulat_integration('scipy_cumtrapz3',
                                            cumulative_trapezoid)
     integrate.set_default_cumulat_integration('scipy_cumtrapz3')
+
 
 def test_integrate():
     array = np.linspace(0, 100)
@@ -51,8 +53,7 @@ def test_integrate():
     array1 = np.random.randn(10, 100, 20)
     x3 = integrate.integrate(array1, dx=dx, axis=1)
 
-    assert x3.shape == (array1.shape[0],array1.shape[2])
-
+    assert x3.shape == (array1.shape[0], array1.shape[2])
 
 
 def test_cumulative_integrate():
@@ -71,11 +72,11 @@ def test_cumulative_integrate():
     x3 = integrate.cumulative_integrate(array1, dx=dx, axis=1, initial=0)
 
     assert x3.shape == array1.shape
-    
+
+
 def test_integrate_validity():
     array = np.linspace(0, 100, 101)
     dx = 1.
-
 
     x1 = integrate.integrate(array, dx=dx)
     x1_correct = 0.5*100*100
@@ -86,5 +87,3 @@ def test_integrate_validity():
     x1_array_correct = 0.5*array*array
 
     assert np.allclose(x1_array, x1_array_correct, atol=0, rtol=1e-12)
-
-

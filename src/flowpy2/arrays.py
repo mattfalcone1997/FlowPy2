@@ -2,11 +2,10 @@ import numpy as np
 import numbers
 import logging
 
-import flowpy2 as fp
 from .io import hdf5
-from abc import ABC, abstractmethod, abstractclassmethod
+from abc import ABC, abstractmethod
 from numpy.lib.mixins import NDArrayOperatorsMixin
-from typing import Iterable, Type, Callable
+from typing import Type, Callable
 
 from matplotlib.rcsetup import validate_string
 logger = logging.getLogger(__name__)
@@ -23,6 +22,7 @@ except ImportError:
 _rc_params = {'backend': 'numpy'}
 _rc_validators = {'backend': validate_string}
 
+
 class ArrayBackends:
     def __init__(self):
         self._array_types = {}
@@ -31,8 +31,8 @@ class ArrayBackends:
 
     def set(self, key: str, array_type: Type, array_creator: Callable,
             np_caster: Callable):
-        """ 
-        each element requires a tuple with the array type, 
+        """
+        each element requires a tuple with the array type,
         creator and a method to cast to numpy except numpy
         """
 
@@ -42,11 +42,11 @@ class ArrayBackends:
         test = [1., 2., 3.]
         creator_test = array_creator(test)
 
-        if type(creator_test) != array_type:
+        if type(creator_test) is not array_type:
             raise TypeError("creator did not product type "
                             f"{array_type.__name__}")
 
-        if type(np_caster(creator_test)) != np.ndarray:
+        if type(np_caster(creator_test)) is not np.ndarray:
             raise TypeError("Numpy caster did not produce numpy array")
 
         self._array_types[key] = array_type
@@ -105,7 +105,7 @@ class CommonArrayExtensions(NDArrayOperatorsMixin, ABC):
     def _preprocess_array_ufunc(self, ufunc, method, *inputs, **kwargs):
         for x in inputs:
             if isinstance(x, CommonArrayExtensions) \
-                    and type(x) != self.__class__:
+                    and type(x) is not self.__class__:
                 raise TypeError("Operations on subclasses of "
                                 "ArrayExtensionsBase are strictly typed")
 
@@ -158,11 +158,14 @@ class CommonArrayExtensions(NDArrayOperatorsMixin, ABC):
         if cls_name not in self._NP_FUNCS:
             logger.debug(f"{cls_name} is not present in _NP_FUNC dictionary "
                          "not implement calls for this class")
+
             return NotImplemented
 
         if func.__name__ not in self._NP_FUNCS[self.__class__.__name__]:
-            logger.debug(f"{func.__name__} not implemented for {cls_name}. "
-                         f"Implemented funcs: {self._NP_FUNCS[cls_name].keys()}")
+            logger.debug(f"{func.__name__} not implemented "
+                         f"for {cls_name}.  Implemented funcs: "
+                         f"{self._NP_FUNCS[cls_name].keys()}")
+
             return NotImplemented
         # Note: this allows subclasses that don't override
         # __array_function__ to handle MyArray objects
@@ -190,13 +193,13 @@ class CommonArrayExtensions(NDArrayOperatorsMixin, ABC):
         pass
 
     @classmethod
-    def _create_struct(cls,**kwargs):
+    def _create_struct(cls, **kwargs):
         return cls(**kwargs)
 
-    def _init_update_kwargs(self,kwargs: dict, key: str, value):
+    def _init_update_kwargs(self, kwargs: dict, key: str, value):
         if key not in kwargs:
             kwargs[key] = value
 
     @abstractmethod
-    def _init_args_from_kwargs(self,*args,**kwargs):
+    def _init_args_from_kwargs(self, *args, **kwargs):
         pass

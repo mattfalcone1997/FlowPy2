@@ -27,7 +27,7 @@ def gradient1_order2_dx(array: np.ndarray, dx: float):
     return gradient
 
 
-@njit( parallel=True, error_model='numpy', cache=True)
+@njit(parallel=True, error_model='numpy', cache=True)
 def gradient1_order2_var_x(array: np.ndarray, x: float):
     gradient = np.zeros_like(array)
 
@@ -269,7 +269,9 @@ def gradient2_order6_dx(array: np.ndarray, dx: float):
 #     return tdma_solve(ldiag, cdiag, rdiag, rhs)
 
 
-# @njit(_gradient_varx_signature, parallel=True, error_model='numpy', cache=True)
+# @njit(_gradient_varx_signature,
+#       parallel=True, error_model='numpy',
+#       cache=True)
 # def _rhs_gradient2_order6_var_x(array: np.ndarray, dx_array: np.ndarray):
 
 #     rhs = np.zeros_like(array)

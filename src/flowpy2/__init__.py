@@ -20,6 +20,7 @@ from .io import HAVE_NETCDF4
 
 from matplotlib import RcParams
 
+
 def _get_validators():
     validators = {}
     from .gradient import _rc_validators
@@ -39,6 +40,7 @@ def _get_validators():
         validators[f'integrate.{k}'] = v
 
     return validators
+
 
 def _get_rc_defaults(rcparams: RcParams):
     from .gradient import _rc_params

@@ -1,0 +1,8 @@
+[flake8]
+per-file-ignores =
+    src/flowpy2/__init__.py: F401
+    src/flowpy2/io/__init__.py: F401
+    src/flowpy2/plotting/__init__.py: F401
+    src/flowpy2/tests/test_indexers.py: F401, F811
+    src/flowpy2/tests/test_coordstruct.py: F401, F811
+    src/flowpy2/tests/test_datastruct.py: F401, F811

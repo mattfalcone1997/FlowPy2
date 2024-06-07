@@ -42,7 +42,7 @@ class IndexBase(ABC):
         return "%s(%s)" % (name, self._index)
 
     def __eq__(self, other_index) -> bool:
-        if type(other_index) != self.__class__:
+        if type(other_index) is not self.__class__:
             return False
         return all(x == y for x, y in zip(self, other_index))
 
@@ -104,7 +104,7 @@ class CompIndexer(IndexBase):
         if isinstance(key, str):
             try:
                 return self.__accessor_dict[key]
-            except KeyError as e:
+            except KeyError:
                 raise KeyError(f"Component {key} not in indexer") from None
 
         elif isinstance(key, list):
@@ -116,7 +116,8 @@ class CompIndexer(IndexBase):
 
         elif isinstance(key, slice):
             try:
-                start = 0 if key.start is None else self.__accessor_dict[key.start]
+                start = 0 if key.start is None \
+                    else self.__accessor_dict[key.start]
             except KeyError:
                 raise KeyError("Start of component slice"
                                f"{key.start} not present") from None
@@ -219,20 +220,6 @@ class CompIndexer(IndexBase):
             return all(v in self._index for v in val)
         else:
             return False
-    # def create_iterable_key(self, keys):
-    #     if isinstance(keys, str):
-    #         return [keys]
-    #     if isinstance(keys, slice):
-    #         start = 0 if keys.start is None else self.__accessor_dict(
-    #             keys.start)
-    #         stop = len(self._index) if keys.stop is None else self.__accessor_dict(
-    #             keys.stop)
-    #         step = 1 if keys.step is None else self.__accessor_dict(keys.step)
-    #         return list(range(start, stop, step))
-    #     elif all(isinstance(key, str) for key in keys):
-    #         return True
-    #     else:
-    #         raise TypeError("key must be ")
 
 
 class DtypeTruncationWarning(UserWarning):
@@ -255,7 +242,10 @@ class TimeIndexer(IndexBase, NDArrayOperatorsMixin):
     _NOT_ALLOWED_UFUNCS = ()
     _NOT_ALLOWED_KWARGS = ('axis', 'out', 'axes')
 
-    def __init__(self, index: Iterable[Number], decimals_round: Optional[int] = None, dtype: DTypeLike = 'f8'):
+    def __init__(self,
+                 index: Iterable[Number],
+                 decimals_round: Optional[int] = None,
+                 dtype: DTypeLike = 'f8'):
 
         self._decimals = decimals_round
         self._dtype = np.dtype(dtype).type
@@ -522,7 +512,7 @@ class TimeIndexer(IndexBase, NDArrayOperatorsMixin):
         return decorator
 
     def __eq__(self, val):
-        if type(val) != type(self):
+        if type(val) is not type(self):
             return False
 
         return np.array_equal(self._index, val._index)

@@ -1,11 +1,10 @@
 import numpy as np
-import pytest
 import flowpy2.numba.gradient as gr
 
 
 def test_gradient_order2_dx():
     """
-    Tests the numba second order approximations of the derivatives 
+    Tests the numba second order approximations of the derivatives
     with constant spacing by testing its exactness to approximately
      machine precision for a second order polynomial
     """
@@ -40,7 +39,7 @@ def test_gradient_order2_dx():
 
 def test_gradient_order2_var_x():
     """
-    Tests the numba second order approximations of the derivatives 
+    Tests the numba second order approximations of the derivatives
     with variable spacing by testing its exactness to approximately
     machine precision for a second order polynomial
     """
@@ -89,7 +88,7 @@ def test_gradient_order2_var_x():
 
 def test_gradient_order6_dx():
     """
-    Tests the numba sixth order approximations of the derivatives 
+    Tests the numba sixth order approximations of the derivatives
     with constant spacing by testing its exactness to approximately
     machine precision for a third order polynomial which reflects that
     the boundaries are only accurate to third order

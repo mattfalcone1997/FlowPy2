@@ -1,16 +1,16 @@
 """
-Backend for matplotlib. Main advantage is the ability to 
-use latex document classes to render figures. This can use 
-installed cls files and a cls file added to the working 
+Backend for matplotlib. Main advantage is the ability to
+use latex document classes to render figures. This can use
+installed cls files and a cls file added to the working
 directory.
 
 document class can be specified using
 mpl.rcParams['pgf.document_class'] = 'jfm'
 
-There is also the functionality to specify a preamble file 
+There is also the functionality to specify a preamble file
 that matches that used in your latex document.
 
-This class also extended to be able to output in the 
+This class also extended to be able to output in the
 PostScript (PS) and  encapsulated PostScript (EPS) formats
 
 Copied and extended from backend_pgf module of matplotlib v3.7.2
@@ -188,8 +188,9 @@ class LatexManager:
                 encoding="utf-8", cwd=self.tmpdir)
         except FileNotFoundError as err:
             raise RuntimeError(
-                f"{rcParams['pgf.texsystem']!r} not found; install it or change "
-                f"rcParams['pgf.texsystem'] to an available TeX implementation"
+                f"{rcParams['pgf.texsystem']!r} not found; "
+                "install it or change rcParams['pgf.texsystem']"
+                " to an available TeX implementation"
             ) from err
         except OSError as err:
             raise RuntimeError(
@@ -312,7 +313,8 @@ class FigureCanvas(FigureCanvasPgf):
         _writeln(fh, r"\makeatother")
         _writeln(fh, r"\endgroup")
 
-    def _print_latex_output(self, fmt, fname_or_fh, *, metadata=None, **kwargs):
+    def _print_latex_output(self, fmt, fname_or_fh, *,
+                            metadata=None, **kwargs):
         """Use LaTeX to compile a pgf generated figure to pdf."""
         w, h = self.figure.get_size_inches()
 
@@ -400,7 +402,8 @@ def _escape_and_apply_props(s, prop):
         commands.append(families[family])
     elif any(font.name == family for font in fm.fontManager.ttflist):
         commands.append(
-            r"\ifdefined\pdftexversion\else\setmainfont{%s}\rmfamily\fi" % family)
+            r"\ifdefined\pdftexversion\else\setmainfont{%s}"
+            r"\rmfamily\fi" % family)
     else:
         _log.warning("Ignoring unknown font: %s", family)
 

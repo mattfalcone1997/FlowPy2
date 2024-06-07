@@ -3,11 +3,11 @@ import numpy as np
 import flowpy2 as fp2
 from .coords import CoordStruct
 from numpy.typing import ArrayLike
-from typing import Iterable, Callable, Union, Mapping, List, Tuple
+from typing import Iterable, Callable, Union, Mapping, Tuple
 from numbers import Number
 from .indexers import CompIndexer, TimeIndexer
 from matplotlib.axes import Axes
-from .arrays import CommonArrayExtensions, array_backends, ArrayBackends
+from .arrays import CommonArrayExtensions, array_backends
 from .flow_type import FlowType
 
 import warnings
@@ -77,8 +77,9 @@ class FlowStructND(CommonArrayExtensions):
 
         coorddata = coorddata.copy()
         if not coorddata.is_consecutive:
-            warnings.warn("CoordStruct is not consecutive, this may cause issues "
-                          f"with certain routines in {type(self).__name__}",
+            warnings.warn("CoordStruct is not consecutive, this "
+                          "may cause issues with certain routines "
+                          f"in {type(self).__name__}",
                           category=UserWarning,
                           stacklevel=find_stack_level())
 
@@ -88,7 +89,11 @@ class FlowStructND(CommonArrayExtensions):
 
         return coorddata
 
-    def _set_array(self, array: ArrayLike, array_backend: str, dtype: Union[str, type], copy: bool):
+    def _set_array(self,
+                   array: ArrayLike,
+                   array_backend: str,
+                   dtype: Union[str, type],
+                   copy: bool):
 
         creator = array_backends.get_creator(array_backend)
         if type(array).__module__ != creator.__module__:
@@ -127,7 +132,7 @@ class FlowStructND(CommonArrayExtensions):
                 raise ValueError(f"Array must be shape {shape} "
                                  f"not {array.shape}") from None
 
-    def reduce(self, operation: Callable, axis: Union[str,Iterable[str]]):
+    def reduce(self, operation: Callable, axis: Union[str, Iterable[str]]):
         coords = self.coords.copy()
 
         if isinstance(axis, str):
@@ -135,14 +140,14 @@ class FlowStructND(CommonArrayExtensions):
         elif hasattr(axis, '__iter__'):
             if not all(a in coords.index for a in axis):
                 raise ValueError("Invalid axis")
-        
+
         data_layout = list(self._data_layout)
         axis_ind = tuple(data_layout.index(a) + 2 for a in axis)
 
         for a in axis:
             coords.remove(a)
             data_layout.remove(a)
-        
+
         array = operation(self._array, axis=axis_ind)
 
         kwargs = self._init_args_from_kwargs(coorddata=coords,
@@ -214,12 +219,12 @@ class FlowStructND(CommonArrayExtensions):
 
             if self._times is None or len(self._times) == 1:
                 return self._fast_get_single_time(comp)
-            
+
             elif isinstance(time, (Number, str)):
                 return self._fast_get_many_time(time, comp)
 
         indexer = [slice(None)]*self._array.ndim
-        shape = [1,None]
+        shape = [1, None]
 
         indexer[1], shape[1], out_fsc = self._process_comp_index(comp)
 
@@ -231,9 +236,11 @@ class FlowStructND(CommonArrayExtensions):
         out_fs = out_fsc or out_fst
 
         if coords_kw:
-            coords, c_indexer = self.coords.create_subdomain(drop_coords=drop_coords,
-                                                             return_indexer=True,
-                                                             **coords_kw)
+            coords, c_indexer = \
+                self.coords.create_subdomain(drop_coords=drop_coords,
+                                             return_indexer=True,
+                                             **coords_kw)
+
             data_layout = []
             for i, d in enumerate(self._data_layout):
                 indexer[2+i] = c_indexer[d]
@@ -273,7 +280,11 @@ class FlowStructND(CommonArrayExtensions):
         return self._array
 
     def _preprocess_array_ufunc(self, ufunc, method, *inputs, **kwargs):
-        actual_inputs = super()._preprocess_array_ufunc(ufunc, method, *inputs, **kwargs)
+        actual_inputs = super()._preprocess_array_ufunc(ufunc,
+                                                        method,
+                                                        *inputs,
+                                                        **kwargs)
+
         for x in actual_inputs:
             if isinstance(x, type(self)):
                 if isinstance(x, type(self)):
@@ -298,8 +309,8 @@ class FlowStructND(CommonArrayExtensions):
             if self._times is None or len(self._times) == 1:
                 return self._fast_get_single_time(key)
             else:
-                time=None
-                comp=key
+                time = None
+                comp = key
 
         return self.get(time=time,
                         comp=comp)
@@ -445,8 +456,10 @@ class FlowStructND(CommonArrayExtensions):
 
         return compat
 
-    def concat_comps(self, fstructs: Union[FlowStructND, Iterable[FlowStructND]],
+    def concat_comps(self,
+                     fstructs: Union[FlowStructND, Iterable[FlowStructND]],
                      inplace=False) -> FlowStructND:
+
         if isinstance(fstructs, FlowStructND):
             fstructs = [fstructs]
 
@@ -475,7 +488,8 @@ class FlowStructND(CommonArrayExtensions):
                                                  comps=new_comps)
             return self._create_struct(**kwargs)
 
-    def concat_times(self, fstructs: Union[FlowStructND, Iterable[FlowStructND]],
+    def concat_times(self,
+                     fstructs: Union[FlowStructND, Iterable[FlowStructND]],
                      inplace=False) -> FlowStructND:
 
         if isinstance(fstructs, FlowStructND):
@@ -515,11 +529,11 @@ class FlowStructND(CommonArrayExtensions):
     def concat(self, fstructs:  Union[FlowStructND, Iterable[FlowStructND]],
                inplace=False) -> FlowStructND:
 
-        if type(fstructs) == type(self):
+        if type(fstructs) is type(self):
             fstructs = [fstructs]
         # check types
 
-        if not all(type(self) == type(fstruct) for fstruct in fstructs):
+        if not all(type(self) is type(fstruct) for fstruct in fstructs):
             raise ValueError("fstructs must be the same "
                              "type or an iterable of them")
 
@@ -536,14 +550,18 @@ class FlowStructND(CommonArrayExtensions):
     def copy(self) -> FlowStructND:
         kwargs = self._init_args_from_kwargs(copy=True)
         return self._create_struct(**kwargs)
-    
+
     def __deepcopy__(self, memo):
         return self.copy()
 
     def Translate(self, **kwargs):
         self._coords.Translate(**kwargs)
 
-    def to_hdf(self, fn_or_obj: str, mode: str = None, key: str = None, compress=False):
+    def to_hdf(self,
+               fn_or_obj: str,
+               mode: str = None,
+               key: str = None,
+               compress=False):
 
         g = hdf5.hdfHandler(fn_or_obj, mode, key)
 
@@ -614,7 +632,10 @@ class FlowStructND(CommonArrayExtensions):
                                        attrs=attrs,
                                        **kwargs)
 
-    def to_netcdf(self, fn_or_obj: str, mode: str = None, key: str = None, compress=True):
+    def to_netcdf(self,
+                  fn_or_obj: str,
+                  mode: str = None,
+                  key: str = None):
 
         if not netcdf.HAVE_NETCDF4:
             raise ModuleNotFoundError("Cannot use netcdf")
@@ -772,9 +793,10 @@ class FlowStructND(CommonArrayExtensions):
         if self.ndim == 1:
             if line is not None and line not in self._data_layout:
                 warnings.warn(("%s is 1D using only"
-                              " valid line '%s' not %s") % (type(self).__name__,
-                                                            self._data_layout[0],
-                                                            line),
+                              " valid line '%s' not %s")
+                              % (type(self).__name__,
+                                 self._data_layout[0],
+                                 line),
                               stacklevel=find_stack_level())
             line = self._data_layout[0]
 
@@ -1002,7 +1024,8 @@ class FlowStructND(CommonArrayExtensions):
         axis_index = self._data_layout.index(axis) + 2
         data = self.get(time=time, comp=comp, squeeze=False, output_fs=False)
 
-        return self.coords.first_derivative(axis, data, axis_index, method=method).squeeze()
+        return self.coords.first_derivative(axis, data, axis_index,
+                                            method=method).squeeze()
 
     def second_derivative(self, comp: str,
                           axis: str,
@@ -1011,7 +1034,8 @@ class FlowStructND(CommonArrayExtensions):
         axis_index = self._data_layout.index(axis) + 2
         data = self.get(time=time, comp=comp, squeeze=False, output_fs=False)
 
-        return self.coords.second_derivative(axis, data, axis_index, method=method).squeeze()
+        return self.coords.second_derivative(axis, data, axis_index,
+                                             method=method).squeeze()
 
     def integrate(self,
                   comp: str,
@@ -1190,7 +1214,10 @@ class FlowStructND(CommonArrayExtensions):
 
 
 @FlowStructND.implements(np.array_equal)
-def array_equal(fstruct1: FlowStructND, fstruct2: FlowStructND, *args, **kwargs):
+def array_equal(fstruct1: FlowStructND,
+                fstruct2: FlowStructND,
+                *args,
+                **kwargs):
     try:
         fstruct1._check_fstruct_compat(fstruct2, True, True)
     except ValueError:

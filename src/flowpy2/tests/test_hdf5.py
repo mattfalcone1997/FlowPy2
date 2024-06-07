@@ -21,7 +21,7 @@ def test_make_group(test_filename):
     g = hdf5.hdfHandler(test_filename, 'w')
     assert g.filename == test_filename
 
-    g1 = hdf5.hdfHandler(g)
+    hdf5.hdfHandler(g)
 
     g2 = hdf5.hdfHandler(g, key="group1")
 
@@ -64,7 +64,6 @@ def test_validate_tag(test_filename):
 
     g.validate_tag(ndarray_subclass, 'weak')
 
-
     with pytest.raises(hdf5.HDF5TagError):
         g1.validate_tag(type(a), 'strict')
 
@@ -97,7 +96,7 @@ def test_validate_tag(test_filename):
     g2.attrs['type_tag'] = "numpyy.ndarray"
     with pytest.raises(hdf5.HDF5TagError):
         g2.validate_tag(np.ndarray, 'weak')
-        
+
 
 def test_access_group(test_filename):
 
@@ -106,19 +105,21 @@ def test_access_group(test_filename):
     hdf5.hdfHandler(g1.filename, 'r')
     hdf5.hdfHandler(g1.filename, 'r', "group1")
 
-def test_getitem(test_filename):
-    g1 = hdf5.hdfHandler(test_filename, 'w', "group1/group2")
 
-    g2 =  hdf5.hdfHandler(test_filename, 'r')
+def test_getitem(test_filename):
+    hdf5.hdfHandler(test_filename, 'w', "group1/group2")
+
+    g2 = hdf5.hdfHandler(test_filename, 'r')
 
     assert g2['group1'].groupname == 'group1'
 
     assert g2['group1']['group2'].groupname == 'group2'
 
+
 def test_dataset(test_filename):
     g1 = hdf5.hdfHandler(test_filename, 'w', "group1/group2")
 
-    a = np.random.randn(100,200,300)
+    a = np.random.randn(100, 200, 300)
     g1.create_dataset('data',
                       data=a)
 
@@ -132,6 +133,7 @@ def test_dataset(test_filename):
 
     assert np.array_equal(a, a2)
 
+
 def test_dataset_str_array(test_filename):
     g1 = hdf5.hdfHandler(test_filename, 'w', "group1/group2")
 
@@ -141,4 +143,3 @@ def test_dataset_str_array(test_filename):
     a1 = g1.read_dataset('data')
 
     assert (a == a1).all()
-
